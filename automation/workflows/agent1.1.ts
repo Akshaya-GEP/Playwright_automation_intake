@@ -5,22 +5,23 @@ import { waitForAiEvents } from './aiEvents';
 import { escapeRegex } from './utils';
 
 /**
- * Agent 1: Supplier Offboarding
+ * Agent 1.1: Supplier Offboarding (Adobe variant)
  * Flow: Search -> Select First Supplier from Grid -> Select Reason -> Create
+ * Uses Adobe-specific env variables: SUPPLIER_NAME_ADOBE, SUPPLIER_CODE_ADOBE, OFFBOARDING_REASON_ADOBE
  */
-export async function workflowAgent1(page: Page, _ctx: AgentContext) {
+export async function workflowAgent1_1(page: Page, _ctx: AgentContext) {
   const env = getEnv();
   
-  // Data from Env
-  const query = env.userQuery || "i want to offboard supplier microsoft";
-  const targetReason = env.reasonOffboard || "Not approved by TPRM";
+  // Data from Env - Adobe specific variables
+  const query = env.userQueryAdobe || "i want to offboard supplier adobe";
+  const targetReason = env.reasonOffboardAdobe || "Not approved by TPRM";
 
   const askField = getAskMeAnythingField(page);
   let aiEventsCount: number | null = null;
 
   try {
     // --- Step 1: Initial Query ---
-    console.log(`Starting Agent 1 Flow with Query: ${query}`);
+    console.log(`Starting Agent 1.1 Flow (Adobe) with Query: ${query}`);
     await expect(askField).toBeVisible({ timeout: 180_000 });
     await askField.fill(query);
     await askField.press('Enter').catch(() => {});
@@ -84,7 +85,7 @@ export async function workflowAgent1(page: Page, _ctx: AgentContext) {
 
     // --- Step 4: Select Offboarding Reason ---
     // Reason buttons
-    const reasonTextRaw = env.reasonOffboard?.trim();
+    const reasonTextRaw = env.reasonOffboardAdobe?.trim();
     const reasonButtons = page
       .getByRole('button', {
         name: /no longer doing business|not approved by tprm|quick setup and pay/i

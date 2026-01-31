@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automation Dashboard</title>
+    <style>
+        body { 
+            font-family: sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            /* Shifted up slightly to ensure dropdown opens downwards */
+            align-items: flex-start; 
+            min-height: 100vh; 
+            background-color: #f4f4f9; 
+            margin: 0;
+            padding-top: 80px;
+        }
+
+        .card { 
+            background: white; 
+            padding: 2rem; 
+            border-radius: 12px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
+            width: 550px; /* Widened to accommodate side-by-side elements */
+            text-align: center; 
+        }
+
+        h2 { margin-top: 0; color: #333; }
+        p { color: #666; margin-bottom: 1.5rem; }
+
+        /* Container for the side-by-side layout */
+        .input-group {
+            display: flex;
+            gap: 12px; /* Space between select and button */
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        select { 
+            flex: 2; /* Takes up more space */
+            padding: 12px; 
+            border-radius: 6px; 
+            border: 1px solid #ccc; 
+            font-size: 16px; 
+            background-color: white;
+            outline: none;
+        }
+
+        button { 
+            flex: 1; /* Takes up less space */
+            padding: 12px; 
+            background-color: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            font-size: 16px; 
+            font-weight: bold;
+            cursor: pointer; 
+            transition: background 0.3s;
+            white-space: nowrap; /* Prevents text from wrapping */
+        }
+
+        button:hover { background-color: #0056b3; }
+
+        optgroup { font-weight: bold; font-size: 15px; color: #333; }
+        
+        #status { 
+            margin-top: 15px; 
+            font-size: 14px; 
+            font-weight: 500;
+            min-height: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Intake Agents</h2>
+    <p>Select an agent to start the test flow.</p>
+    
+    <div class="input-group">
+        <select id="agentSelect">
+            <option value="" disabled selected>Select an Agent</option>
+            <optgroup label="Supplier Offboarding Assistant">
+                <option value="1">Supplier Offboarding Assistant-1</option>
+                <option value="1.1">Supplier Offboarding Assistant-2</option>
+                <option value="1.2">Supplier Offboarding Assistant-3</option>
+            </optgroup>
+            <optgroup label="Contract Termination Assistant">
+                <option value="3">Contract Termination Assistant-1</option>
+                <option value="3.1">Contract Termination Assistant-2</option>
+            </optgroup>
+            <optgroup label="Contract Extension Assistant">
+                <option value="4">Contract Extension Assistant-1</option>
+                <option value="4">Contract Extension Assistant-2</option>
+            </optgroup>
+            <optgroup label="Contract Amendment Assistant">
+                <option value="2">Contract Amendment Assistant-1</option>
+                <option value="2">Contract Amendment Assistant-2</option>
+            </optgroup>
+            <optgroup label="Supplier Profile Update Assistant">
+                <option value="5">Supplier Profile Update Assistant-1</option>
+                <option value="5">Supplier Profile Update Assistant-2</option>
+            </optgroup>
+        </select>
+
+        <button onclick="runTest()">Run Test</button>
+    </div>
+
+    <div id="status"></div>
+</div>
+
+<script>
+    async function runTest() {
+        const agentId = document.getElementById('agentSelect').value;
+        const statusDiv = document.getElementById('status');
+
+        if (!agentId) {
+            statusDiv.innerHTML = "⚠️ Please select an agent first.";
+            statusDiv.style.color = "red";
+            return;
+        }
+
+        statusDiv.innerText = "⏳ Requesting test run...";
+        statusDiv.style.color = "blue";
+
+        try {
+            const response = await fetch('http://localhost:3001/run-test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ agentId })
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                statusDiv.innerText = `✅ Success: ${data.message}`;
+                statusDiv.style.color = "green";
+            } else {
+                statusDiv.innerText = `❌ Error: ${data.error}`;
+                statusDiv.style.color = "red";
+            }
+        } catch (error) {
+            statusDiv.innerText = "❌ Failed to connect to server.";
+            statusDiv.style.color = "red";
+            console.error(error);
+        }
+    }
+</script>
+
+</body>
+</html>

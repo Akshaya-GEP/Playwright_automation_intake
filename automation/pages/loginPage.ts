@@ -44,7 +44,7 @@ export class LoginPage {
       await this.loginWithPasswordButton.click();
     }
 
-    await expect(this.passwordInput).toBeVisible({ timeout: 30_000 });
+    await expect(this.passwordInput).toBeVisible({ timeout: 10_000 });
     await this.passwordInput.fill(password);
 
     // Prefer a dedicated "Login" button if present; otherwise click "Login with Password" again as a fallback.
@@ -59,7 +59,8 @@ export class LoginPage {
 
     // After login, don't wait for `networkidle` (SPAs often keep the network busy via polling/websockets).
     // Instead, wait for *any* reliable "logged in" signal.
-    const postLoginTimeoutMs = 45_000;
+    // Reduced timeout for faster authentication completion
+    const postLoginTimeoutMs = 15_000;
 
     const logoutLike = this.page
       .getByRole('button', { name: /logout|log out|sign out/i })

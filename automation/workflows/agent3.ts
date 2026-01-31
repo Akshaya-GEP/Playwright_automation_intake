@@ -19,10 +19,15 @@ export async function workflowAgent3(_page: Page, _ctx: AgentContext) {
   aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
 
   // Wait for summary text and proceed question
-  const summarySignal = page.getByText(/would you like to proceed with the termination request\?/i);
+  // UI shows: "Would you like to go ahead with the termination request?" or "would you like to proceed with the termination request?"
+  const summarySignal = page.getByText(/would you like to (go ahead|proceed) with the termination request\?/i);
   await expect(summarySignal.first()).toBeVisible({ timeout: 240_000 });
 
-  const proceedWithRequest = page.getByRole('button', { name: /proceed with request/i });
+  // Use more specific selector to avoid matching other "Proceed" buttons
+  const proceedWithRequest = page
+    .getByRole('button', { name: /^proceed with request$/i })
+    .or(page.getByRole('button', { name: /proceed\s+with\s+request/i }))
+    .first();
   await expect(proceedWithRequest).toBeVisible({ timeout: 240_000 });
   try {
     await expect(proceedWithRequest).toBeEnabled({ timeout: 60_000 });
@@ -36,7 +41,8 @@ export async function workflowAgent3(_page: Page, _ctx: AgentContext) {
   const modePrompt = page.getByText(/how would you like to proceed with the termination\?/i);
   await expect(modePrompt.first()).toBeVisible({ timeout: 240_000 });
 
-  const status = normalizeTerminationStatus(env.terminationStatus) ?? 'future';
+  // Agent 3 uses TERMINATION_STATUS_3 (defaults to 'future' to run date picker flow)
+  const status = normalizeTerminationStatus(env.terminationStatus3) ?? 'future';
   if (status === 'immediate') {
     const terminateImmediately = page.getByRole('button', { name: /terminate immediately/i });
     await expect(terminateImmediately).toBeVisible({ timeout: 240_000 });
@@ -68,8 +74,46 @@ export async function workflowAgent3(_page: Page, _ctx: AgentContext) {
     page.locator('.mat-calendar, .cdk-overlay-pane, .mat-datepicker-content, [role="dialog"], [role="grid"]').first()
   ).toBeVisible({ timeout: 30_000 });
 
-  // Select the date: 2028 / January / 20
-  await selectDateInMaterialCalendar(page, 2028, 'JAN', 20);
+  // Select the date from env variables
+  // Parse date from env: can be full date (YYYY-MM-DD) or separate year/month/day
+  let year = 2028;
+  let month = 'JAN';
+  let day = 20;
+
+  if (env.terminationDate3) {
+    // Parse date string (format: YYYY-MM-DD or YYYY/MM/DD)
+    const dateMatch = env.terminationDate3.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+    if (dateMatch) {
+      year = parseInt(dateMatch[1]);
+      const monthNum = parseInt(dateMatch[2]);
+      day = parseInt(dateMatch[3]);
+      // Convert month number to abbreviation
+      const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+      month = monthNames[monthNum - 1] || 'JAN';
+    }
+  } else {
+    // Use separate year/month/day env variables
+    if (env.terminationYear3) {
+      year = parseInt(env.terminationYear3);
+    }
+    if (env.terminationMonth3) {
+      // If it's a number (01-12), convert to abbreviation
+      const monthNum = parseInt(env.terminationMonth3);
+      if (!isNaN(monthNum) && monthNum >= 1 && monthNum <= 12) {
+        const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+        month = monthNames[monthNum - 1];
+      } else {
+        // Assume it's already an abbreviation (JAN, FEB, etc.)
+        month = env.terminationMonth3.toUpperCase().substring(0, 3);
+      }
+    }
+    if (env.terminationDay3) {
+      day = parseInt(env.terminationDay3);
+    }
+  }
+
+  console.log(`Selecting termination date: ${day} ${month} ${year}`);
+  await selectDateInMaterialCalendar(page, year, month, day);
 
   // Click outside to close calendar if still open
   await page.keyboard.press('Escape').catch(() => {});
@@ -89,7 +133,8 @@ export async function workflowAgent3(_page: Page, _ctx: AgentContext) {
   const reasonPrompt = page.getByText(/what is the reason for terminating this contract\?/i);
   await expect(reasonPrompt.first()).toBeVisible({ timeout: 240_000 });
 
-  await clickTerminationReason(page, env.reasonTerminate);
+  // Use REASON_TERMINATE_3 for agent3
+  await clickTerminationReason(page, env.reasonTerminate3);
   aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
 
   // Wait for create request prompt and click Create Request
@@ -102,9 +147,18 @@ export async function workflowAgent3(_page: Page, _ctx: AgentContext) {
   await createRequest.click();
   aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
 
-  // Final: wait for send for validation / send validation button
+  // Final: wait for send for validation / send validation button and click it
   const sendValidation = page.getByRole('button', { name: /send (for )?validation/i });
   await expect(sendValidation).toBeVisible({ timeout: 240_000 });
+  await expect(sendValidation).toBeEnabled({ timeout: 60_000 });
+  await sendValidation.click();
+  aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
+
+  // Wait for final success message
+  const successMessage = page.getByText(/Congrats.*Project Request.*sent for validation/i)
+    .or(page.getByText(/sent for validation/i))
+    .or(page.getByText(/Congrats/i));
+  await expect(successMessage.first()).toBeVisible({ timeout: 180_000 });
 }
 
 function getPromptField(page: Page): Locator {
@@ -116,7 +170,7 @@ function getPromptField(page: Page): Locator {
 
 
 /**
- * Opens the date picker by clicking on the yellow date field
+ * Opens the date picker by clicking on the date input field STRICTLY
  * UI shows: calendar icon on left, "*Date" label, "DD/MM/YYYY" placeholder
  */
 async function openDatePicker(page: Page): Promise<void> {
@@ -130,115 +184,142 @@ async function openDatePicker(page: Page): Promise<void> {
 
   if (await isCalendarOpen()) return;
 
-  // Wait a moment for the date field to fully render
+  // Wait for the date field section to be fully rendered
   await page.waitForTimeout(2000);
 
-  // Try multiple ways to find the date placeholder text
-  // Use regex to be flexible with spacing/casing
-  const ddmmyyyyLocators = [
-    page.getByText(/dd\/mm\/yyyy/i).first(),
-    page.locator('text=DD/MM/YYYY').first(),
-    page.locator(':text("DD/MM/YYYY")').first(),
-    page.locator('[placeholder*="DD/MM/YYYY"]').first(),
-    page.locator('input[placeholder*="date" i]').first(),
-  ];
-
-  let dateField: Locator | null = null;
-  for (const locator of ddmmyyyyLocators) {
-    if (await locator.count() && await locator.isVisible().catch(() => false)) {
-      dateField = locator;
-      break;
-    }
-  }
-
-  // If we found the date field, try clicking it
-  if (dateField) {
-    const box = await dateField.boundingBox();
-    if (box) {
-      // Click on the calendar icon area (left side of the yellow box)
-      await page.mouse.click(box.x - 30, box.y + box.height / 2);
-      await page.waitForTimeout(1000);
-      if (await isCalendarOpen()) return;
-
-      // Click directly on the text
-      await dateField.click({ force: true }).catch(() => {});
-      await page.waitForTimeout(1000);
-      if (await isCalendarOpen()) return;
-    }
-
-    // Try parent containers
-    for (let i = 0; i < 4; i++) {
-      let parent = dateField;
-      for (let j = 0; j <= i; j++) {
-        parent = parent.locator('xpath=..');
-      }
-      await parent.click({ force: true }).catch(() => {});
-      await page.waitForTimeout(500);
-      if (await isCalendarOpen()) return;
-    }
-  }
-
-  // Alternative: Find by "*Date" label
-  const dateLabel = page.getByText(/^\*\s*Date$/i).first();
-  if (await dateLabel.count()) {
-    // Click on or near the label
-    await dateLabel.click({ force: true }).catch(() => {});
-    await page.waitForTimeout(500);
-    if (await isCalendarOpen()) return;
-
-    // Click the parent container
-    const labelParent = dateLabel.locator('xpath=ancestor::div[2]');
-    await labelParent.click({ force: true }).catch(() => {});
-    await page.waitForTimeout(500);
-    if (await isCalendarOpen()) return;
-  }
-
-  // Try finding "Termination Date" section and clicking elements inside
-  const terminationDateHeader = page.getByText(/termination date/i).first();
-  if (await terminationDateHeader.count()) {
-    // The yellow box should be a sibling or child of this section
-    const section = terminationDateHeader.locator('xpath=ancestor::div[2]');
+  // STRICT APPROACH: Find the actual input field element directly
+  // Priority 1: Find input with placeholder containing "DD/MM/YYYY" or "date"
+  const dateInput = page.locator('input[placeholder*="DD/MM/YYYY" i], input[placeholder*="dd/mm/yyyy" i], input[placeholder*="date" i]').first();
+  
+  if (await dateInput.count() > 0) {
+    // Ensure it's visible
+    await expect(dateInput).toBeVisible({ timeout: 10_000 });
     
-    // Find any clickable elements in the section
-    const clickables = section.locator('input, button, svg, [role="button"], [tabindex]');
-    const count = await clickables.count();
-    for (let i = 0; i < count; i++) {
-      await clickables.nth(i).click({ force: true }).catch(() => {});
+    // Click the input field STRICTLY - use scrollIntoView and click
+    await dateInput.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(500);
+    
+    // Try clicking the input directly
+    await dateInput.click({ force: true, timeout: 10_000 });
+    await page.waitForTimeout(1000);
+    if (await isCalendarOpen()) return;
+    
+    // If direct click didn't work, try clicking via JavaScript (strict)
+    await dateInput.evaluate((el: HTMLElement) => {
+      (el as HTMLInputElement).focus();
+      (el as HTMLInputElement).click();
+    });
+    await page.waitForTimeout(1000);
+    if (await isCalendarOpen()) return;
+  }
+
+  // Priority 2: Find input field by finding the text "DD/MM/YYYY" and getting its parent input
+  const ddmmyyyyText = page.getByText(/DD\/MM\/YYYY|dd\/mm\/yyyy/i).first();
+  if (await ddmmyyyyText.count() > 0) {
+    await expect(ddmmyyyyText).toBeVisible({ timeout: 10_000 });
+    
+    // Find the input element near this text - look in parent containers
+    const parentContainer = ddmmyyyyText.locator('xpath=ancestor::div[1]');
+    const inputNearText = parentContainer.locator('input').first();
+    if (await inputNearText.count() > 0) {
+      await inputNearText.scrollIntoViewIfNeeded();
       await page.waitForTimeout(500);
+      await inputNearText.click({ force: true, timeout: 10_000 });
+      await page.waitForTimeout(1000);
+      if (await isCalendarOpen()) return;
+    }
+    
+    // Or click the text element itself (it might be inside the input wrapper)
+    await ddmmyyyyText.click({ force: true, timeout: 10_000 });
+    await page.waitForTimeout(1000);
+    if (await isCalendarOpen()) return;
+  }
+
+  // Priority 3: Find mat-datepicker-toggle button (calendar icon)
+  const toggle = page.locator('mat-datepicker-toggle button, [class*="datepicker-toggle"] button, button[aria-label*="calendar" i], button[aria-label*="date" i]').first();
+  if (await toggle.count() > 0) {
+    await expect(toggle).toBeVisible({ timeout: 10_000 });
+    await toggle.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(500);
+    await toggle.click({ force: true, timeout: 10_000 });
+    await page.waitForTimeout(1000);
+    if (await isCalendarOpen()) return;
+  }
+
+  // Priority 4: Find input by "*Date" label - locate the input in the same form field
+  const dateLabel = page.getByText(/^\*\s*Date$/i).first();
+  if (await dateLabel.count() > 0) {
+    await expect(dateLabel).toBeVisible({ timeout: 10_000 });
+    
+    // Find input in the same container/form field - look in parent and following siblings
+    const parentField = dateLabel.locator('xpath=ancestor::div[1]');
+    const inputInField = parentField.locator('input').first();
+    if (await inputInField.count() > 0) {
+      await inputInField.scrollIntoViewIfNeeded();
+      await page.waitForTimeout(500);
+      await inputInField.click({ force: true, timeout: 10_000 });
+      await page.waitForTimeout(1000);
+      if (await isCalendarOpen()) return;
+    }
+    
+    // Try finding input after the label
+    const inputAfterLabel = dateLabel.locator('xpath=following::input[1]').first();
+    if (await inputAfterLabel.count() > 0) {
+      await inputAfterLabel.scrollIntoViewIfNeeded();
+      await page.waitForTimeout(500);
+      await inputAfterLabel.click({ force: true, timeout: 10_000 });
+      await page.waitForTimeout(1000);
       if (await isCalendarOpen()) return;
     }
   }
 
-  // Try mat-datepicker-toggle
-  const toggle = page.locator('mat-datepicker-toggle, [class*="datepicker-toggle"]').first();
-  if (await toggle.count()) {
-    await toggle.click({ force: true }).catch(() => {});
-    await page.waitForTimeout(500);
+  // Priority 5: Find any input in the "Termination Date" section
+  const terminationDateSection = page.getByText(/termination date/i).first();
+  if (await terminationDateSection.count() > 0) {
+    // Look for input in parent containers
+    const parentDiv = terminationDateSection.locator('xpath=ancestor::div[2]');
+    const inputInSection = parentDiv.locator('input').first();
+    if (await inputInSection.count() > 0) {
+      await expect(inputInSection).toBeVisible({ timeout: 10_000 });
+      await inputInSection.scrollIntoViewIfNeeded();
+      await page.waitForTimeout(500);
+      await inputInSection.click({ force: true, timeout: 10_000 });
+      await page.waitForTimeout(1000);
+      if (await isCalendarOpen()) return;
+    }
+  }
+
+  // Final fallback: Use JavaScript to find and click the date input STRICTLY
+  const clicked = await page.evaluate(() => {
+    // Find input with date-related attributes
+    const inputs = Array.from(document.querySelectorAll('input'));
+    for (const input of inputs) {
+      const htmlInput = input as HTMLInputElement;
+      const placeholder = (htmlInput.placeholder || '').toLowerCase();
+      const type = htmlInput.type || '';
+      const className = input.className || '';
+      
+      if (
+        placeholder.includes('dd/mm/yyyy') ||
+        placeholder.includes('date') ||
+        type === 'date' ||
+        className.includes('date') ||
+        className.includes('picker')
+      ) {
+        htmlInput.focus();
+        htmlInput.click();
+        return true;
+      }
+    }
+    return false;
+  });
+
+  if (clicked) {
+    await page.waitForTimeout(1000);
     if (await isCalendarOpen()) return;
   }
 
-  // JavaScript approach - find and click anything with calendar/date
-  await page.evaluate(() => {
-    const selectors = [
-      'mat-datepicker-toggle',
-      '[class*="datepicker"]',
-      '[class*="calendar"]',
-      'input[type="date"]',
-      '[aria-label*="date" i]',
-      '[aria-label*="calendar" i]',
-    ];
-    for (const sel of selectors) {
-      const el = document.querySelector(sel);
-      if (el) {
-        (el as HTMLElement).click();
-        return;
-      }
-    }
-  }).catch(() => {});
-  await page.waitForTimeout(500);
-  if (await isCalendarOpen()) return;
-
-  // Final check with longer timeout
+  // Final check - wait for calendar to appear
   await expect(page.locator('.mat-calendar, .cdk-overlay-pane, .mat-datepicker-content')).toBeVisible({ timeout: 15_000 });
 }
 
@@ -271,38 +352,173 @@ async function selectDateInMaterialCalendar(page: Page, year: number, month: str
 
   // Navigate to and select the year (within overlay)
   await navigateToYearInOverlay(page, overlay, year);
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(500);
 
-  // Select month (after selecting year, calendar shows months)
-  // Month abbreviations: JAN, FEB, MAR, etc.
-  const monthCell = overlay.locator('.mat-calendar-body-cell').filter({ hasText: new RegExp(`^${month}$`, 'i') }).first();
-  if (await monthCell.count()) {
-    await monthCell.click();
-    await page.waitForTimeout(300);
-  }
+  // After selecting year, we're back in month view
+  // Navigate to the target month by clicking wrapper-actions-container
+  await navigateToMonthInOverlay(page, overlay, month, year);
+  await page.waitForTimeout(500);
 
-  // Select day using aria-label for precise matching
-  // The cells have aria-label like "Friday, February 1 2041"
-  // Match by the day number at the end of the label
-  const dayCell = overlay.locator(`.mat-calendar-body-cell[aria-label*=" ${day} "], .mat-calendar-body-cell[aria-label$=" ${day}"]`).first();
+  // Select day - IMPORTANT: Filter out disabled dates
+  // Disabled dates have class "mat-calendar-body-disabled" and aria-disabled="true"
+  // We need to find enabled dates only - use CSS selector to exclude disabled
+  const dayCellEnabled = overlay
+    .locator('.mat-calendar-body-cell:not(.mat-calendar-body-disabled)')
+    .filter({ hasNot: overlay.locator('[aria-disabled="true"]') })
+    .filter({ hasText: new RegExp(`^${day}$`) })
+    .first();
   
-  if (await dayCell.count()) {
-    await dayCell.click();
+  // Try finding enabled date cell
+  if (await dayCellEnabled.count() > 0) {
+    await expect(dayCellEnabled).toBeVisible({ timeout: 5_000 });
+    await dayCellEnabled.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(200);
+    await dayCellEnabled.click({ force: true });
   } else {
-    // Fallback: find by the cell content text
-    const dayCellByContent = overlay.locator('.mat-calendar-body-cell').filter({ hasText: new RegExp(`^${day}$`) }).first();
-    if (await dayCellByContent.count()) {
-      await dayCellByContent.click();
-    } else {
-      // Last resort: click the cell-content div directly
-      const dayContent = overlay.locator('.mat-calendar-body-cell-content').filter({ hasText: new RegExp(`^${day}$`) }).first();
-      if (await dayContent.count()) {
-        await dayContent.click();
+    // Fallback: Use JavaScript to find and click enabled date (more reliable)
+    const clicked = await page.evaluate(({ targetDay, targetMonth, targetYear }: { targetDay: number; targetMonth: string; targetYear: number }) => {
+      const cells = Array.from(document.querySelectorAll('.mat-calendar-body-cell'));
+      for (const cell of cells) {
+        // Skip disabled dates
+        const isDisabled = cell.classList.contains('mat-calendar-body-disabled') || 
+                          cell.getAttribute('aria-disabled') === 'true';
+        if (isDisabled) continue;
+        
+        const ariaLabel = cell.getAttribute('aria-label') || '';
+        const cellText = cell.textContent?.trim() || '';
+        
+        // Check if this is the target date
+        // Match day number and verify year/month in aria-label
+        if (cellText === String(targetDay) && 
+            ariaLabel.includes(String(targetYear)) &&
+            ariaLabel.toUpperCase().includes(targetMonth.toUpperCase())) {
+          (cell as HTMLElement).click();
+          return true;
+        }
       }
+      return false;
+    }, { targetDay: day, targetMonth: month, targetYear: year });
+    
+    if (!clicked) {
+      throw new Error(`Could not find enabled date cell for ${day} ${month} ${year}`);
     }
   }
 
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(500);
+}
+
+/**
+ * Navigate to a specific month in the calendar (within overlay)
+ * Uses wrapper-actions-container div to click next/previous buttons
+ */
+async function navigateToMonthInOverlay(page: Page, overlay: Locator, targetMonth: string, targetYear: number): Promise<void> {
+  const monthNames = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 
+                      'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
+  const monthAbbr = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  
+  // Convert month abbreviation to full name for matching
+  const targetMonthIndex = monthAbbr.indexOf(targetMonth.toUpperCase());
+  const targetMonthFull = targetMonthIndex >= 0 ? monthNames[targetMonthIndex] : targetMonth.toUpperCase();
+  
+  const maxAttempts = 24; // Maximum 12 months forward + 12 months backward
+  
+  for (let i = 0; i < maxAttempts; i++) {
+    // Get current month/year from period button
+    const headerText = await overlay.locator('.mat-calendar-period-button').textContent().catch(() => '');
+    const monthYearMatch = headerText?.match(/([A-Z]+)\s+(\d{4})/);
+    
+    if (monthYearMatch) {
+      const currentMonth = monthYearMatch[1].toUpperCase();
+      const currentYear = parseInt(monthYearMatch[2]);
+      
+      // Check if we're at the target month and year
+      if (currentMonth === targetMonthFull && currentYear === targetYear) {
+        return; // We're at the target month
+      }
+      
+      // Determine if we need to go forward or backward
+      const currentMonthIndex = monthNames.indexOf(currentMonth);
+      const targetMonthIndexNum = monthAbbr.indexOf(targetMonth.toUpperCase());
+      
+      // If same year, navigate by month index
+      if (currentYear === targetYear) {
+        if (targetMonthIndexNum > currentMonthIndex) {
+          // Need to go forward
+          await clickNextMonthViaWrapper(page, overlay);
+        } else if (targetMonthIndexNum < currentMonthIndex) {
+          // Need to go backward
+          await clickPreviousMonthViaWrapper(page, overlay);
+        }
+      } else if (targetYear > currentYear) {
+        // Need to go forward (next year)
+        await clickNextMonthViaWrapper(page, overlay);
+      } else {
+        // Need to go backward (previous year)
+        await clickPreviousMonthViaWrapper(page, overlay);
+      }
+    } else {
+      // Can't parse header, try clicking next
+      await clickNextMonthViaWrapper(page, overlay);
+    }
+    
+    await page.waitForTimeout(300);
+  }
+  
+  // Final check - verify we're at the target month
+  const finalHeaderText = await overlay.locator('.mat-calendar-period-button').textContent().catch(() => '');
+  const finalMatch = finalHeaderText?.match(/([A-Z]+)\s+(\d{4})/);
+  if (finalMatch) {
+    const finalMonth = finalMatch[1].toUpperCase();
+    const finalYear = parseInt(finalMatch[2]);
+    const targetMonthFull = monthAbbr.indexOf(targetMonth.toUpperCase()) >= 0 
+      ? monthNames[monthAbbr.indexOf(targetMonth.toUpperCase())] 
+      : targetMonth.toUpperCase();
+    
+    if (finalMonth !== targetMonthFull || finalYear !== targetYear) {
+      throw new Error(`Could not navigate to ${targetMonth} ${targetYear}. Current: ${finalMonth} ${finalYear}`);
+    }
+  }
+}
+
+/**
+ * Click next month button via wrapper-actions-container div
+ */
+async function clickNextMonthViaWrapper(page: Page, overlay: Locator): Promise<void> {
+  // Find the wrapper-actions-container div - search both in overlay and page level
+  const wrapperActions = page.locator('.wrapper-actions-container.wrapper-actions').first();
+  
+  if (await wrapperActions.count() > 0) {
+    // User specified to click on the wrapper div itself to navigate
+    await wrapperActions.click({ timeout: 5_000 }).catch(() => {});
+  } else {
+    // Fallback: Try clicking the next button directly within overlay
+    const nextButton = overlay.locator('.mat-calendar-next-button:not([disabled])').first();
+    if (await nextButton.count() > 0) {
+      await nextButton.click({ timeout: 5_000 }).catch(() => {});
+    }
+  }
+}
+
+/**
+ * Click previous month button via wrapper-actions-container div
+ */
+async function clickPreviousMonthViaWrapper(page: Page, overlay: Locator): Promise<void> {
+  // For previous navigation, find and click the previous button directly
+  // The wrapper div click might only work for forward navigation
+  const prevButton = overlay.locator('.mat-calendar-previous-button:not([disabled])').first();
+  
+  if (await prevButton.count() > 0) {
+    await prevButton.click({ timeout: 5_000 }).catch(() => {});
+  } else {
+    // Fallback: Try finding previous button in wrapper-actions-container
+    const wrapperActions = page.locator('.wrapper-actions-container.wrapper-actions').first();
+    if (await wrapperActions.count() > 0) {
+      const prevButtonInWrapper = wrapperActions.locator('.mat-calendar-previous-button:not([disabled])').first();
+      if (await prevButtonInWrapper.count() > 0) {
+        await prevButtonInWrapper.click({ timeout: 5_000 }).catch(() => {});
+      }
+    }
+  }
 }
 
 /**
@@ -313,9 +529,19 @@ async function navigateToYearInOverlay(page: Page, overlay: Locator, targetYear:
   
   for (let i = 0; i < maxAttempts; i++) {
     // Check if target year is visible in the overlay
-    const yearCell = overlay.locator('.mat-calendar-body-cell').filter({ hasText: new RegExp(`^${targetYear}$`) }).first();
-    if (await yearCell.count()) {
-      await yearCell.click();
+    // Filter out disabled years if any
+    const yearCell = overlay
+      .locator('.mat-calendar-body-cell')
+      .filter({ hasNot: overlay.locator('.mat-calendar-body-disabled') })
+      .filter({ hasText: new RegExp(`^${targetYear}$`) })
+      .first();
+    
+    if (await yearCell.count() > 0) {
+      await expect(yearCell).toBeVisible({ timeout: 5_000 });
+      await yearCell.scrollIntoViewIfNeeded();
+      await page.waitForTimeout(200);
+      await yearCell.click({ force: true });
+      await page.waitForTimeout(500);
       return;
     }
 

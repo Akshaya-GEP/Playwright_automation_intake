@@ -26,8 +26,8 @@ setup('authenticate', async ({ page }) => {
   await loginPage.login(env.userId, env.password);
   await loginPage.assertLoggedIn();
 
-  // Wait for the app to fully load after login
-  await page.waitForLoadState('domcontentloaded');
+  // Wait for the app to fully load after login (reduced timeout for faster completion)
+  await page.waitForLoadState('domcontentloaded', { timeout: 10_000 }).catch(() => {});
 
   // Save the authenticated state to a file
   await page.context().storageState({ path: STORAGE_STATE });
