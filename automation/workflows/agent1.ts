@@ -2,7 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { getEnv } from '../utils/env';
 import type { AgentContext } from './types';
 import { waitForAiEvents } from './aiEvents';
-import { escapeRegex } from './utils';
+import { escapeRegex, finalizeRequestFlow } from './utils';
 
 /**
  * Agent 1: Supplier Offboarding
@@ -114,44 +114,23 @@ export async function workflowAgent1(page: Page, _ctx: AgentContext) {
 
     // --- Step 5: Create Request ---
     // Next: click "create request"
+    console.log('Clicking Create Request button...');
     const createRequest = page.getByRole('button', { name: /create request/i });
     await expect(createRequest).toBeEnabled();
     await createRequest.click();
     aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
+    console.log('Create Request button clicked, waiting for final request screen...');
+    await page.waitForTimeout(2000); // Wait for UI to update after Create Request
 
-    // --- Step 6: Success Validation ---
-    // 1. Success Message
-    await expect(page.getByText(/Request created successfully/i).first()).toBeVisible({ timeout: 180_000 });
-
-    // 2. PRQ Number Generation Check (PRQ-XXXXXX)
-    await expect(page.getByText(/Request Number:\s*PRQ-/i)).toBeVisible();
-
-    // 3. End of Flow Indicator ("Send for validation")
-    const endFlowSignal = page.getByText(/Send for validation/i)
-        .or(page.getByRole('button', { name: /send for validation/i }));
-    await expect(endFlowSignal.first()).toBeVisible({ timeout: 60_000 });
-
-    console.log("✅ Workflow completed successfully.");
+    // Standard end condition for all flows
+    const end = await finalizeRequestFlow(page);
+    console.log(`✅ Finalized flow. Ended by: ${end.endedBy}`);
 
   } catch (error) {
     console.error("❌ Workflow failed!", error);
     throw error;
   } finally {
-    // --- FINAL WAIT: Stay in browser for 1 minute (only if page is still open) ---
-    try {
-      const isClosed = page.isClosed();
-      if (!isClosed) {
-        console.log("⏳ Keeping browser open for 60 seconds (inspection time)...");
-        // eslint-disable-next-line playwright/no-wait-for-timeout
-        await page.waitForTimeout(60000).catch(() => {
-          console.log("Page closed during wait, exiting...");
-        });
-      } else {
-        console.log("Page already closed, skipping wait...");
-      }
-    } catch (e) {
-      console.log("Could not check page status, skipping wait...");
-    }
+    // No inspection wait: keep tests within Playwright's per-test timeout.
   }
 }
 

@@ -23,39 +23,38 @@ export type EnvConfig = {
   userQuery: string;
   userQuery2: string;
   userQuery3: string;
-  userQuery4: string; // Added for Agent 4
+  userQuery4: string; 
+  userQuery1_3?: string;
 
   // Agent Specific Params
   reasonOffboard?: string;
   reasonAmend?: string;
+  reasonAmend2?: string; 
   terminationStatus?: string;
-  terminationStatus3?: string; // Agent 3 specific
-  terminationStatus3_1?: string; // Agent 3_1 specific
-  terminationDate3?: string; // Agent 3 date (format: YYYY-MM-DD or YYYY/MM/DD)
-  terminationYear3?: string; // Agent 3 year
-  terminationMonth3?: string; // Agent 3 month (JAN, FEB, etc. or 01-12)
-  terminationDay3?: string; // Agent 3 day
+  terminationStatus3?: string; 
+  terminationStatus3_1?: string; 
+  terminationDate3?: string; 
+  terminationYear3?: string; 
+  terminationMonth3?: string; 
+  terminationDay3?: string; 
   reasonTerminate?: string;
-  reasonTerminate3?: string; // Agent 3 specific
-  reasonTerminate3_1?: string; // Agent 3_1 specific
+  reasonTerminate3?: string; 
+  reasonTerminate3_1?: string; 
   supplierName?: string;
-  // Add this to your EnvConfig type and getEnv return object
   supplierCode?: string;
 
-// Inside getEnv():
-  
-  
   // Agent 4 Specifics
   reasonForExtension?: string;
+  reasonForExtension2?: string; 
   modifications?: string;
-  extensionDate4?: string; // Agent 4 extension date (format: YYYY-MM-DD or YYYY/MM/DD)
-  extensionYear4?: string; // Agent 4 year
-  extensionMonth4?: string; // Agent 4 month (JAN, FEB, etc. or 01-12)
-  extensionDay4?: string; // Agent 4 day
-  updateOption?: string; // Agent 4 update option (e.g., "cost efficiency")
-  currency?: string; // Agent 4 currency (e.g., "EUR")
-  estimatedCost?: string; // Agent 4 estimated cost (e.g., "1000")
-  approval?: string; // Agent 4 budget approval status (e.g., "Approved", "Draft - Not Yet Submitted")
+  extensionDate4?: string; 
+  extensionYear4?: string; 
+  extensionMonth4?: string; 
+  extensionDay4?: string; 
+  updateOption?: string; 
+  currency?: string; 
+  estimatedCost?: string; 
+  approval?: string; 
 
   // Agent 1.1 (Adobe) Specifics
   userQueryAdobe?: string;
@@ -73,9 +72,11 @@ export type EnvConfig = {
   userQuery5?: string;
   supplierName5?: string;
   supplierCode5?: string;
-  updateType5?: string; // e.g., "Update" or "Block/ Unblock Supplier"
-  reasonAction5?: string; // Detailed reason for the update
-  uploadFile5?: string; // File path for document upload
+  updateType5?: string; 
+  updateType5_2?: string; // TC2
+  reasonAction5?: string; 
+  reasonAction5_2?: string; // TC2
+  uploadFile5?: string; 
 
   agents: [string, string, string, string, string];
 };
@@ -86,21 +87,23 @@ export function getEnv(): EnvConfig {
   const password = required('PASSWORD');
   const qubeMeshUrl = required('QUBE_MESH_URL');
 
-  // Queries (added fallback/check for lower camelCase keys as seen in your .env)
+  // Queries
   const userQuery = process.env.USER_QUERY || 'Hello from Playwright';
   const userQuery2 = process.env.USER_QUERY2 || 'Hello from Playwright (Agent 2)';
   const userQuery3 = process.env.USER_QUERY3 || 'Hello from Playwright (Agent 3)';
   const userQuery4 = process.env.userQuery4 || process.env.USER_QUERY4 || 'Hello from Playwright (Agent 4)';
+  const userQuery1_3 = optional('USER_QUERY_1_3') || optional('USER_QUERY1_3');
 
   // Existing Optional Params
   const reasonOffboard = optional('REASON_OFFBOARD');
   const reasonAmend = optional('REASON_AMEND');
+  const reasonAmend2 = optional('REASON_AMEND_2');
   const terminationStatus = optional('TERMINATION_STATUS');
   const terminationStatus3 = optional('TERMINATION_STATUS_3');
   const terminationStatus3_1 = optional('TERMINATION_STATUS_3_1');
-  const terminationDate3 = optional('TERMINATION_DATE_3'); // Format: YYYY-MM-DD or YYYY/MM/DD
+  const terminationDate3 = optional('TERMINATION_DATE_3'); 
   const terminationYear3 = optional('TERMINATION_YEAR_3');
-  const terminationMonth3 = optional('TERMINATION_MONTH_3'); // JAN, FEB, etc. or 01-12
+  const terminationMonth3 = optional('TERMINATION_MONTH_3'); 
   const terminationDay3 = optional('TERMINATION_DAY_3');
   const reasonTerminate = optional('REASON_TERMINATE');
   const reasonTerminate3 = optional('REASON_TERMINATE_3');
@@ -109,12 +112,12 @@ export function getEnv(): EnvConfig {
   const supplierCode = optional('SUPPLIER_CODE');
 
   // Agent 4 Optional Params
-  // Checks for camelCase (as per your .env) or UPPERCASE for consistency
   const reasonForExtension = optional('reasonForExtension') || optional('REASON_FOR_EXTENSION');
+  const reasonForExtension2 = optional('REASON_FOR_EXTENSION_2'); 
   const modifications = optional('modifications') || optional('MODIFICATIONS');
-  const extensionDate4 = optional('EXTENSION_DATE_4'); // Format: YYYY-MM-DD or YYYY/MM/DD
+  const extensionDate4 = optional('EXTENSION_DATE_4'); 
   const extensionYear4 = optional('EXTENSION_YEAR_4');
-  const extensionMonth4 = optional('EXTENSION_MONTH_4'); // JAN, FEB, etc. or 01-12
+  const extensionMonth4 = optional('EXTENSION_MONTH_4'); 
   const extensionDay4 = optional('EXTENSION_DAY_4');
   const updateOption = optional('update_option') || optional('UPDATE_OPTION');
   const currency = optional('currency') || optional('CURRENCY');
@@ -138,7 +141,9 @@ export function getEnv(): EnvConfig {
   const supplierName5 = optional('SUPPLIER_NAME_5');
   const supplierCode5 = optional('SUPPLIER_CODE_5');
   const updateType5 = optional('UPDATE_TYPE_5') || optional('UPDATE_5');
+  const updateType5_2 = optional('UPDATE_TYPE_5_2') || optional('UPDATE_TYPE_5.2'); // Added mapping for .2
   const reasonAction5 = optional('REASON_ACTION_5');
+  const reasonAction5_2 = optional('REASON_ACTION_5_2') || optional('REASON_ACTION_5.2'); // Added mapping for .2
   const uploadFile5 = optional('UPLOAD_FILE_5');
 
   // Preferred: AGENT_1..AGENT_5 (explicit)
@@ -176,8 +181,10 @@ export function getEnv(): EnvConfig {
     userQuery2,
     userQuery3,
     userQuery4,
+    userQuery1_3,
     reasonOffboard,
     reasonAmend,
+    reasonAmend2, 
     terminationStatus,
     terminationStatus3,
     terminationStatus3_1,
@@ -191,6 +198,7 @@ export function getEnv(): EnvConfig {
     supplierName,
     supplierCode,
     reasonForExtension,
+    reasonForExtension2, 
     modifications,
     extensionDate4,
     extensionYear4,
@@ -212,7 +220,9 @@ export function getEnv(): EnvConfig {
     supplierName5,
     supplierCode5,
     updateType5,
+    updateType5_2,
     reasonAction5,
+    reasonAction5_2,
     uploadFile5,
     agents,
   };

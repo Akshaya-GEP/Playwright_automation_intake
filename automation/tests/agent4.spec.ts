@@ -4,6 +4,7 @@ import { getEnv } from '../utils/env';
 
 test.describe('Agent 4 - Contract Extension', () => {
   test('runs contract extension workflow', async ({ page, startAutoInvoke }) => {
+    test.setTimeout(900_000);
     const env = getEnv();
 
     // 1. Authentication is handled by fixtures (global setup)

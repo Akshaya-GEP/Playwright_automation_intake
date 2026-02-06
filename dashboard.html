@@ -5,11 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Automation Dashboard</title>
     <style>
+        :root {
+            --btn-blue-bg: #d9e7ff;
+            --btn-blue-border: #b8cff7;
+            --btn-blue-hover: #c7dcff;
+            --btn-green-bg: #d6f5e3;
+            --btn-green-border: #a7e2c2;
+            --btn-green-hover: #c3f0d5;
+            --btn-text: #1f2a37;
+        }
+
         body { 
             font-family: sans-serif; 
             display: flex; 
             justify-content: center; 
-            /* Shifted up slightly to ensure dropdown opens downwards */
             align-items: flex-start; 
             min-height: 100vh; 
             background-color: #f4f4f9; 
@@ -22,46 +31,71 @@
             padding: 2rem; 
             border-radius: 12px; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
-            width: 550px; /* Widened to accommodate side-by-side elements */
+            width: 620px; 
             text-align: center; 
         }
 
         h2 { margin-top: 0; color: #333; }
         p { color: #666; margin-bottom: 1.5rem; }
 
-        /* Container for the side-by-side layout */
         .input-group {
             display: flex;
-            gap: 12px; /* Space between select and button */
+            gap: 12px; 
             align-items: center;
             margin-bottom: 20px;
         }
 
         select { 
-            flex: 2; /* Takes up more space */
-            padding: 12px; 
-            border-radius: 6px; 
+            flex: 2; 
+            padding: 14px; 
+            border-radius: 10px; 
             border: 1px solid #ccc; 
-            font-size: 16px; 
+            font-size: 17px; 
             background-color: white;
             outline: none;
+            min-height: 48px;
         }
 
         button { 
-            flex: 1; /* Takes up less space */
-            padding: 12px; 
-            background-color: #007bff; 
-            color: white; 
-            border: none; 
-            border-radius: 6px; 
-            font-size: 16px; 
+            flex: 1; 
+            padding: 14px; 
+            background-color: var(--btn-blue-bg);
+            color: var(--btn-text); 
+            border: 1px solid var(--btn-blue-border); 
+            border-radius: 10px; 
+            font-size: 17px; 
             font-weight: bold;
             cursor: pointer; 
             transition: background 0.3s;
-            white-space: nowrap; /* Prevents text from wrapping */
+            white-space: nowrap; 
+            min-height: 48px;
         }
 
-        button:hover { background-color: #0056b3; }
+        button:hover { background-color: var(--btn-blue-hover); }
+        button:disabled { background-color: #eef2f7; border-color: #d5dbe6; color: #8b97a8; cursor: not-allowed; }
+
+        .btn-blue { background-color: var(--btn-blue-bg); border-color: var(--btn-blue-border); }
+        .btn-blue:hover { background-color: var(--btn-blue-hover); }
+        .btn-green { background-color: var(--btn-green-bg); border-color: var(--btn-green-border); }
+        .btn-green:hover { background-color: var(--btn-green-hover); }
+
+        /* Stack buttons vertically (Report below Run All Tests) */
+        .secondary-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: -8px;
+            margin-bottom: 20px;
+        }
+
+        /* Smaller, non-primary action buttons */
+        .btn-small {
+            flex: 0 0 auto;
+            min-height: 40px;
+            padding: 10px 14px;
+            font-size: 14px;
+            border-radius: 10px;
+        }
 
         optgroup { font-weight: bold; font-size: 15px; color: #333; }
         
@@ -71,6 +105,26 @@
             font-weight: 500;
             min-height: 20px;
         }
+
+        /* Optional helper buttons (non-mandatory) */
+        .debug-row {
+            margin-top: 10px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .debug-btn {
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #eef0f3;
+            color: #333;
+            border: 1px solid #d7dbe0;
+            border-radius: 6px;
+            cursor: pointer;
+            flex: 0 0 auto;
+        }
+        .debug-btn:hover { background: #e3e7ec; }
     </style>
 </head>
 <body>
@@ -86,6 +140,7 @@
                 <option value="1">Supplier Offboarding Assistant-1</option>
                 <option value="1.1">Supplier Offboarding Assistant-2</option>
                 <option value="1.2">Supplier Offboarding Assistant-3</option>
+                <option value="1.3">Supplier Offboarding Assistant-4</option>
             </optgroup>
             <optgroup label="Contract Termination Assistant">
                 <option value="3">Contract Termination Assistant-1</option>
@@ -93,40 +148,76 @@
             </optgroup>
             <optgroup label="Contract Extension Assistant">
                 <option value="4">Contract Extension Assistant-1</option>
-                <option value="4">Contract Extension Assistant-2</option>
+                <option value="4.1">Contract Extension Assistant-2</option>
             </optgroup>
             <optgroup label="Contract Amendment Assistant">
                 <option value="2">Contract Amendment Assistant-1</option>
-                <option value="2">Contract Amendment Assistant-2</option>
+                <option value="2.1">Contract Amendment Assistant-2</option>
             </optgroup>
             <optgroup label="Supplier Profile Update Assistant">
                 <option value="5">Supplier Profile Update Assistant-1</option>
-                <option value="5">Supplier Profile Update Assistant-2</option>
+                <option value="5.1">Supplier Profile Update Assistant-2</option>
             </optgroup>
         </select>
 
-        <button onclick="runTest()">Run Test</button>
+        <button onclick="runTest()" id="runBtn" class="btn-blue">Run Test</button>
     </div>
 
     <div id="status"></div>
+
+    <div class="debug-row">
+        <button onclick="runAllTestsHeaded()" id="runAllBtn" class="btn-blue btn-small" title="Optional: run full suite (headed)">
+            Run All Tests
+        </button>
+        <button onclick="openReport()" id="reportBtn" class="btn-green btn-small" title="Optional: open latest Playwright report">
+            Report
+        </button>
+        <button class="debug-btn" onclick="startDebugUi()" id="debugBtn" title="Optional: opens Playwright UI mode for debugging">
+            Debug (UI)
+        </button>
+    </div>
 </div>
 
 <script>
+    // If you open this file directly (file://), use the local runner server.
+    // If you open it via the runner server (http://localhost:3001/), use relative URLs.
+    const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:3001' : '';
+
+    function setStatus(text, color) {
+        const statusDiv = document.getElementById('status');
+        statusDiv.innerText = text;
+        statusDiv.style.color = color || '#333';
+    }
+
+    function setButtonsDisabled(disabled) {
+        const runBtn = document.getElementById('runBtn');
+        const runAllBtn = document.getElementById('runAllBtn');
+        const reportBtn = document.getElementById('reportBtn');
+        const debugBtn = document.getElementById('debugBtn');
+
+        runBtn.disabled = disabled;
+        runAllBtn.disabled = disabled;
+        reportBtn.disabled = disabled;
+        debugBtn.disabled = disabled;
+
+        runBtn.innerText = disabled ? "Running..." : "Run Test";
+        runAllBtn.innerText = disabled ? "Running..." : "Run All Tests";
+    }
+
     async function runTest() {
         const agentId = document.getElementById('agentSelect').value;
-        const statusDiv = document.getElementById('status');
 
         if (!agentId) {
-            statusDiv.innerHTML = "⚠️ Please select an agent first.";
-            statusDiv.style.color = "red";
+            setStatus("⚠️ Please select an agent first.", "red");
             return;
         }
 
-        statusDiv.innerText = "⏳ Requesting test run...";
-        statusDiv.style.color = "blue";
+        // Update UI to running state
+        setStatus("⏳ Running test... Please wait.", "blue");
+        setButtonsDisabled(true);
 
         try {
-            const response = await fetch('http://localhost:3001/run-test', {
+            const response = await fetch(`${API_BASE}/run-test`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ agentId })
@@ -134,17 +225,79 @@
 
             const data = await response.json();
             
-            if (response.ok) {
-                statusDiv.innerText = `✅ Success: ${data.message}`;
-                statusDiv.style.color = "green";
+            if (response.ok && data.success) {
+                setStatus(`✅ ${data.message}`, "green");
             } else {
-                statusDiv.innerText = `❌ Error: ${data.error}`;
-                statusDiv.style.color = "red";
+                setStatus(`❌ Error: ${data.error}`, "red");
             }
         } catch (error) {
-            statusDiv.innerText = "❌ Failed to connect to server.";
-            statusDiv.style.color = "red";
+            setStatus("❌ Failed to connect to server.", "red");
             console.error(error);
+        } finally {
+            // Restore button state
+            setButtonsDisabled(false);
+        }
+    }
+
+    async function runAllTestsHeaded() {
+        setStatus("⏳ Running all tests ... Please wait.", "blue");
+        setButtonsDisabled(true);
+
+        try {
+            const response = await fetch(`${API_BASE}/run-all-tests`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const data = await response.json();
+            if (response.ok && data.success) {
+                setStatus(`✅ ${data.message}`, "green");
+            } else {
+                setStatus(`❌ Error: ${data.error}`, "red");
+            }
+        } catch (error) {
+            setStatus("❌ Failed to connect to server.", "red");
+            console.error(error);
+        } finally {
+            setButtonsDisabled(false);
+        }
+    }
+
+    async function openReport() {
+        setStatus("⏳ Opening report...", "blue");
+        try {
+            const statusResp = await fetch(`${API_BASE}/report-status`, { method: 'GET' });
+            const statusData = await statusResp.json().catch(() => ({}));
+            if (!statusResp.ok || !statusData.exists) {
+                setStatus("❌ Report not available yet. Run a test first to generate it.", "red");
+                return;
+            }
+
+            window.open(`${API_BASE}/report/index.html`, '_blank', 'noopener,noreferrer');
+            setStatus("✅ Report opened in a new tab.", "green");
+        } catch (error) {
+            setStatus("❌ Failed to connect to server.", "red");
+            console.error(error);
+        }
+    }
+
+    async function startDebugUi() {
+        setStatus("⏳ Starting Playwright UI mode...", "blue");
+        try {
+            const resp = await fetch(`${API_BASE}/debug-ui`, { method: 'POST' });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                setStatus(`❌ ${data.error || 'Failed to start UI mode.'}`, "red");
+                return;
+            }
+
+            // UI mode typically runs on localhost:9323
+            const url = data.url || 'http://localhost:9323';
+            window.open(url, '_blank', 'noopener,noreferrer');
+            setStatus("✅ Debug UI started (opened in a new tab).", "green");
+        } catch (e) {
+            console.error(e);
+            setStatus("❌ Failed to connect to server.", "red");
         }
     }
 </script>

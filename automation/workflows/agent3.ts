@@ -3,6 +3,7 @@ import { getEnv } from '../utils/env';
 import type { AgentContext } from './types';
 import { waitForAiEvents } from './aiEvents';
 import { clickTerminationReason, normalizeTerminationStatus } from './terminationUtils';
+import { finalizeRequestFlow } from './utils';
 
 export async function workflowAgent3(_page: Page, _ctx: AgentContext) {
   const page = _page;
@@ -11,12 +12,15 @@ export async function workflowAgent3(_page: Page, _ctx: AgentContext) {
   const askField = getPromptField(page);
   let aiEventsCount: number | null = null;
 
-  // Start query
-  await expect(askField).toBeVisible({ timeout: 180_000 });
-  await askField.click({ timeout: 30_000 }).catch(() => {});
-  await askField.fill(env.userQuery3);
-  await askField.press('Enter').catch(() => {});
-  aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
+  try {
+    console.log(`Starting Agent 3 Flow (Future Date Termination) with Query: ${env.userQuery3}`);
+    
+    // Start query
+    await expect(askField).toBeVisible({ timeout: 180_000 });
+    await askField.click({ timeout: 30_000 }).catch(() => {});
+    await askField.fill(env.userQuery3);
+    await askField.press('Enter').catch(() => {});
+    aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
 
   // Wait for summary text and proceed question
   // UI shows: "Would you like to go ahead with the termination request?" or "would you like to proceed with the termination request?"
@@ -55,24 +59,37 @@ export async function workflowAgent3(_page: Page, _ctx: AgentContext) {
     aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
 
     // Date selection step (only for "future")
+    console.log('Starting date selection step...');
     const datePrompt = page.getByText(/capture the new contract termination date/i);
     await expect(datePrompt.first()).toBeVisible({ timeout: 60_000 });
+    console.log('Date prompt found');
 
   // =====================================================
   // SIMPLIFIED DATE PICKER LOGIC
   // =====================================================
   
   // Wait for the Proceed button to appear (confirms date section is loaded)
+  console.log('Waiting for Proceed button to appear...');
   const proceedBtn = page.getByRole('button', { name: /^proceed$/i });
   await expect(proceedBtn).toBeVisible({ timeout: 60_000 });
+  console.log('Proceed button found');
 
   // Find and click the date picker to open it
-  await openDatePicker(page);
+  console.log('Opening date picker...');
+  try {
+    await openDatePicker(page);
+    console.log('Date picker opened successfully');
+  } catch (error) {
+    console.error('Failed to open date picker:', error);
+    throw new Error(`Failed to open date picker: ${error}`);
+  }
 
   // Wait for calendar to be visible (could be mat-calendar, overlay, or any calendar popup)
+  console.log('Waiting for calendar to be visible...');
   await expect(
     page.locator('.mat-calendar, .cdk-overlay-pane, .mat-datepicker-content, [role="dialog"], [role="grid"]').first()
   ).toBeVisible({ timeout: 30_000 });
+  console.log('Calendar is visible');
 
   // Select the date from env variables
   // Parse date from env: can be full date (YYYY-MM-DD) or separate year/month/day
@@ -113,16 +130,35 @@ export async function workflowAgent3(_page: Page, _ctx: AgentContext) {
   }
 
   console.log(`Selecting termination date: ${day} ${month} ${year}`);
-  await selectDateInMaterialCalendar(page, year, month, day);
+  try {
+    await selectDateInMaterialCalendar(page, year, month, day);
+    console.log('Date selected successfully');
+  } catch (error) {
+    console.error('Failed to select date:', error);
+    throw new Error(`Failed to select date ${day} ${month} ${year}: ${error}`);
+  }
 
+  // Wait for calendar to close and date to be populated
+  await page.waitForTimeout(1000);
+  
   // Click outside to close calendar if still open
   await page.keyboard.press('Escape').catch(() => {});
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(500);
 
-    // Click Proceed
-    await expect(proceedBtn).toBeEnabled({ timeout: 60_000 });
-    await proceedBtn.click();
-    aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
+  // Verify date was selected by checking if Proceed button is enabled
+  console.log('Verifying date selection and clicking Proceed...');
+  await expect(proceedBtn).toBeEnabled({ timeout: 60_000 });
+  console.log('Proceed button is enabled');
+  
+  await proceedBtn.click();
+  console.log('Proceed button clicked');
+  
+  // Wait for AI events to process
+  aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
+  console.log('Date selection step completed, moving to next step...');
+  
+  // Wait a bit for the UI to update after proceeding
+  await page.waitForTimeout(2000);
   }
 
   // =====================================================
@@ -141,24 +177,29 @@ export async function workflowAgent3(_page: Page, _ctx: AgentContext) {
   const createPrompt = page.getByText(/would you like to create the project request with these details\?/i);
   await expect(createPrompt.first()).toBeVisible({ timeout: 240_000 });
 
+  console.log('Clicking Create Request button...');
   const createRequest = page.getByRole('button', { name: /create request/i });
   await expect(createRequest).toBeVisible({ timeout: 240_000 });
   await expect(createRequest).toBeEnabled({ timeout: 240_000 });
   await createRequest.click();
   aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
+  console.log('Create Request button clicked, waiting for Send for Validation button...');
 
-  // Final: wait for send for validation / send validation button and click it
-  const sendValidation = page.getByRole('button', { name: /send (for )?validation/i });
-  await expect(sendValidation).toBeVisible({ timeout: 240_000 });
-  await expect(sendValidation).toBeEnabled({ timeout: 60_000 });
-  await sendValidation.click();
-  aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
-
-  // Wait for final success message
-  const successMessage = page.getByText(/Congrats.*Project Request.*sent for validation/i)
-    .or(page.getByText(/sent for validation/i))
-    .or(page.getByText(/Congrats/i));
-  await expect(successMessage.first()).toBeVisible({ timeout: 180_000 });
+  // Standard end condition for all flows
+  await page.waitForTimeout(2000); // Wait for UI to update after Create Request
+  const end = await finalizeRequestFlow(page);
+  console.log(`✅ Finalized flow. Ended by: ${end.endedBy}`);
+  } catch (error) {
+    console.error("❌ Agent 3 workflow failed!", error);
+    // Log current page state for debugging
+    try {
+      const pageText = await page.locator('body').textContent().catch(() => 'Could not get page text');
+      console.log('Page text preview at error:', pageText?.substring(0, 1000));
+    } catch (e) {
+      console.log('Could not get page text for debugging');
+    }
+    throw error;
+  }
 }
 
 function getPromptField(page: Page): Locator {
@@ -171,15 +212,19 @@ function getPromptField(page: Page): Locator {
 
 /**
  * Opens the date picker by clicking on the date input field STRICTLY
- * UI shows: calendar icon on left, "*Date" label, "DD/MM/YYYY" placeholder
+ * UI can be either:
+ * - Angular Material datepicker input (with calendar toggle)
+ * - Nexxe date widget (label "Date" + span-date-element placeholder inside .nexxe-input-wrapper.input-date)
  */
 async function openDatePicker(page: Page): Promise<void> {
   // Check if calendar is already open
-  const isCalendarOpen = async () => {
+  const isCalendarOpen = async (): Promise<boolean> => {
     const matCal = await page.locator('.mat-calendar').isVisible().catch(() => false);
     const overlay = await page.locator('.cdk-overlay-pane').isVisible().catch(() => false);
     const datepicker = await page.locator('.mat-datepicker-content').isVisible().catch(() => false);
-    return matCal || overlay || datepicker;
+    const backdrop = await page.locator('.cdk-overlay-backdrop-showing').isVisible().catch(() => false);
+    const overlayContainerHasChildren = (await page.locator('.cdk-overlay-container > *').count().catch(() => 0)) > 0;
+    return matCal || overlay || datepicker || backdrop || overlayContainerHasChildren;
   };
 
   if (await isCalendarOpen()) return;
@@ -187,140 +232,196 @@ async function openDatePicker(page: Page): Promise<void> {
   // Wait for the date field section to be fully rendered
   await page.waitForTimeout(2000);
 
-  // STRICT APPROACH: Find the actual input field element directly
-  // Priority 1: Find input with placeholder containing "DD/MM/YYYY" or "date"
-  const dateInput = page.locator('input[placeholder*="DD/MM/YYYY" i], input[placeholder*="dd/mm/yyyy" i], input[placeholder*="date" i]').first();
-  
-  if (await dateInput.count() > 0) {
-    // Ensure it's visible
-    await expect(dateInput).toBeVisible({ timeout: 10_000 });
-    
-    // Click the input field STRICTLY - use scrollIntoView and click
-    await dateInput.scrollIntoViewIfNeeded();
-    await page.waitForTimeout(500);
-    
-    // Try clicking the input directly
-    await dateInput.click({ force: true, timeout: 10_000 });
-    await page.waitForTimeout(1000);
-    if (await isCalendarOpen()) return;
-    
-    // If direct click didn't work, try clicking via JavaScript (strict)
-    await dateInput.evaluate((el: HTMLElement) => {
-      (el as HTMLInputElement).focus();
-      (el as HTMLInputElement).click();
-    });
-    await page.waitForTimeout(1000);
-    if (await isCalendarOpen()) return;
-  }
-
-  // Priority 2: Find input field by finding the text "DD/MM/YYYY" and getting its parent input
-  const ddmmyyyyText = page.getByText(/DD\/MM\/YYYY|dd\/mm\/yyyy/i).first();
-  if (await ddmmyyyyText.count() > 0) {
-    await expect(ddmmyyyyText).toBeVisible({ timeout: 10_000 });
-    
-    // Find the input element near this text - look in parent containers
-    const parentContainer = ddmmyyyyText.locator('xpath=ancestor::div[1]');
-    const inputNearText = parentContainer.locator('input').first();
-    if (await inputNearText.count() > 0) {
-      await inputNearText.scrollIntoViewIfNeeded();
-      await page.waitForTimeout(500);
-      await inputNearText.click({ force: true, timeout: 10_000 });
+  // PRIORITY 1: Try clicking the calendar icon button first (most reliable)
+  // The calendar icon is on the left side of the date input
+  const calendarIconButton = page.locator('mat-datepicker-toggle button, button[matDatepickerToggle], [class*="datepicker-toggle"] button, button[aria-label*="calendar" i], button[aria-label*="date" i]').first();
+  if (await calendarIconButton.count() > 0) {
+    try {
+      await expect(calendarIconButton).toBeVisible({ timeout: 10_000 });
+      // Scroll into view and click using Playwright methods
+      await calendarIconButton.scrollIntoViewIfNeeded();
+      await calendarIconButton.click({ timeout: 10_000 });
       await page.waitForTimeout(1000);
       if (await isCalendarOpen()) return;
+    } catch (e) {
+      console.log('Calendar icon button click failed, trying other methods...');
     }
-    
-    // Or click the text element itself (it might be inside the input wrapper)
-    await ddmmyyyyText.click({ force: true, timeout: 10_000 });
-    await page.waitForTimeout(1000);
-    if (await isCalendarOpen()) return;
   }
 
-  // Priority 3: Find mat-datepicker-toggle button (calendar icon)
-  const toggle = page.locator('mat-datepicker-toggle button, [class*="datepicker-toggle"] button, button[aria-label*="calendar" i], button[aria-label*="date" i]').first();
-  if (await toggle.count() > 0) {
-    await expect(toggle).toBeVisible({ timeout: 10_000 });
-    await toggle.scrollIntoViewIfNeeded();
-    await page.waitForTimeout(500);
-    await toggle.click({ force: true, timeout: 10_000 });
-    await page.waitForTimeout(1000);
-    if (await isCalendarOpen()) return;
+  // PRIORITY 2: Find input with placeholder "DD/MM/YYYY" and click it directly
+  // Use Playwright locator instead of page.evaluate to avoid serialization issues
+  const dateInputByPlaceholder = page.locator('input[placeholder*="DD/MM/YYYY" i], input[placeholder*="dd/mm/yyyy" i]').first();
+  if (await dateInputByPlaceholder.count() > 0) {
+    try {
+      await expect(dateInputByPlaceholder).toBeVisible({ timeout: 10_000 });
+      await dateInputByPlaceholder.scrollIntoViewIfNeeded();
+      await dateInputByPlaceholder.click({ timeout: 10_000 });
+      await page.waitForTimeout(1000);
+      if (await isCalendarOpen()) return;
+    } catch (e) {
+      console.log('Date input by placeholder click failed, trying other methods...');
+    }
   }
 
-  // Priority 4: Find input by "*Date" label - locate the input in the same form field
+  // PRIORITY 3: Nexxe date widget (matches DOM snippet: label id="Date" + span-date-element placeholder)
+  // User requirement: click on Date label first, then open date picker widget
+  // Also: avoid repeated scrollIntoView calls (causes scrollbar "to and fro")
+  const tryOpenNexxeDateWidget = async (): Promise<boolean> => {
+    // Strong signal from DOM snippet: <label id="Date" class="input-label">Date</label>
+    const dateLabelById = page.locator('label#Date, label[id="Date"]').first();
+    const dateLabelByText = page.locator('label.input-label').filter({ hasText: /^Date$/i }).first();
+    const dateLabel = (await dateLabelById.count()) ? dateLabelById : dateLabelByText;
+    if (!(await dateLabel.count())) return false;
+
+    // Find the containing nexxe widget wrapper from the label (most reliable)
+    const widgetFromLabel = dateLabel.locator(
+      'xpath=ancestor::div[contains(@class,"nexxe-input-wrapper") and contains(@class,"input-date")][1]'
+    );
+    const widget = (await widgetFromLabel.count())
+      ? widgetFromLabel.first()
+      : page.locator('.nexxe-input-wrapper.input-date').filter({ has: dateLabel }).first();
+
+    if (!(await widget.count())) return false;
+
+    await expect(widget).toBeVisible({ timeout: 10_000 });
+    // Single scroll only (prevents bouncing)
+    await widget.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(200);
+
+    // 1) Click label first (focus)
+    await dateLabel.click({ timeout: 5_000 }).catch(() => {});
+    await page.waitForTimeout(200);
+
+    // 2) Click the widget "input" area using mouse coords (avoids additional auto-scroll)
+    const inputContainer = widget.locator('.input-container[aria-label="Date"], .input-container').first();
+    const dateSpan = widget.locator('.span-date-element, .span-element.span-date-element').first();
+    const clickTarget = (await dateSpan.count()) ? dateSpan : inputContainer;
+
+    const clickByBoxCenter = async (loc: Locator): Promise<boolean> => {
+      const box = await loc.boundingBox().catch(() => null);
+      if (!box) return false;
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      return true;
+    };
+
+    // A couple of attempts (sometimes first click just focuses)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      // Prefer mouse click to avoid Playwright triggering more scrolling
+      const clicked = await clickByBoxCenter(clickTarget).catch(() => false);
+      if (!clicked) {
+        // fallback to force click (still might scroll, but we already centered widget)
+        await clickTarget.click({ timeout: 5_000, force: true }).catch(() => {});
+      }
+      // Wait briefly for CDK overlay to show up
+      const overlayAppeared = await page
+        .locator('.cdk-overlay-backdrop-showing, .cdk-overlay-pane, .mat-calendar, .mat-datepicker-content')
+        .first()
+        .isVisible()
+        .catch(() => false);
+      if (overlayAppeared || (await isCalendarOpen())) return true;
+      await page.waitForTimeout(400);
+    }
+
+    return await isCalendarOpen();
+  };
+
+  if (await tryOpenNexxeDateWidget()) return;
+
+  // PRIORITY 4: Find input by "*Date" label - locate the input field near it
   const dateLabel = page.getByText(/^\*\s*Date$/i).first();
   if (await dateLabel.count() > 0) {
-    await expect(dateLabel).toBeVisible({ timeout: 10_000 });
-    
-    // Find input in the same container/form field - look in parent and following siblings
-    const parentField = dateLabel.locator('xpath=ancestor::div[1]');
-    const inputInField = parentField.locator('input').first();
-    if (await inputInField.count() > 0) {
-      await inputInField.scrollIntoViewIfNeeded();
-      await page.waitForTimeout(500);
-      await inputInField.click({ force: true, timeout: 10_000 });
-      await page.waitForTimeout(1000);
-      if (await isCalendarOpen()) return;
-    }
-    
-    // Try finding input after the label
-    const inputAfterLabel = dateLabel.locator('xpath=following::input[1]').first();
-    if (await inputAfterLabel.count() > 0) {
-      await inputAfterLabel.scrollIntoViewIfNeeded();
-      await page.waitForTimeout(500);
-      await inputAfterLabel.click({ force: true, timeout: 10_000 });
-      await page.waitForTimeout(1000);
-      if (await isCalendarOpen()) return;
+    try {
+      await expect(dateLabel).toBeVisible({ timeout: 10_000 });
+      
+      // Find input near the label using Playwright locators
+      const dateInputNearLabel = dateLabel.locator('..').locator('input').first();
+      if (await dateInputNearLabel.count() > 0) {
+        try {
+          await expect(dateInputNearLabel).toBeVisible({ timeout: 10_000 });
+          await dateInputNearLabel.scrollIntoViewIfNeeded();
+          await dateInputNearLabel.click({ timeout: 10_000 });
+          await page.waitForTimeout(1000);
+          if (await isCalendarOpen()) return;
+        } catch (e) {
+          // Try finding input in parent containers
+          let parent = dateLabel.locator('..');
+          for (let i = 0; i < 5; i++) {
+            const inputInParent = parent.locator('input').first();
+            if (await inputInParent.count() > 0) {
+              try {
+                await expect(inputInParent).toBeVisible({ timeout: 5_000 });
+                await inputInParent.scrollIntoViewIfNeeded();
+                await inputInParent.click({ timeout: 10_000 });
+                await page.waitForTimeout(1000);
+                if (await isCalendarOpen()) return;
+                break;
+              } catch (e2) {
+                // Continue to next parent
+              }
+            }
+            parent = parent.locator('..');
+          }
+        }
+      }
+    } catch (e) {
+      console.log('Date label method failed, trying other methods...');
     }
   }
 
-  // Priority 5: Find any input in the "Termination Date" section
+  // PRIORITY 5: Find input in "Termination Date" section
   const terminationDateSection = page.getByText(/termination date/i).first();
   if (await terminationDateSection.count() > 0) {
-    // Look for input in parent containers
-    const parentDiv = terminationDateSection.locator('xpath=ancestor::div[2]');
-    const inputInSection = parentDiv.locator('input').first();
-    if (await inputInSection.count() > 0) {
-      await expect(inputInSection).toBeVisible({ timeout: 10_000 });
-      await inputInSection.scrollIntoViewIfNeeded();
-      await page.waitForTimeout(500);
-      await inputInSection.click({ force: true, timeout: 10_000 });
-      await page.waitForTimeout(1000);
-      if (await isCalendarOpen()) return;
+    try {
+      // Find input near termination date section using Playwright locators
+      let parent = terminationDateSection.locator('..');
+      for (let i = 0; i < 5; i++) {
+        const inputInParent = parent.locator('input').first();
+        if (await inputInParent.count() > 0) {
+          try {
+            await expect(inputInParent).toBeVisible({ timeout: 5_000 });
+            await inputInParent.scrollIntoViewIfNeeded();
+            await inputInParent.click({ timeout: 10_000 });
+            await page.waitForTimeout(1000);
+            if (await isCalendarOpen()) return;
+            break;
+          } catch (e2) {
+            // Continue to next parent
+          }
+        }
+        parent = parent.locator('..');
+      }
+    } catch (e) {
+      console.log('Termination date section method failed, trying fallback...');
     }
   }
 
-  // Final fallback: Use JavaScript to find and click the date input STRICTLY
-  const clicked = await page.evaluate(() => {
-    // Find input with date-related attributes
-    const inputs = Array.from(document.querySelectorAll('input'));
-    for (const input of inputs) {
-      const htmlInput = input as HTMLInputElement;
-      const placeholder = (htmlInput.placeholder || '').toLowerCase();
-      const type = htmlInput.type || '';
-      const className = input.className || '';
-      
-      if (
-        placeholder.includes('dd/mm/yyyy') ||
-        placeholder.includes('date') ||
-        type === 'date' ||
-        className.includes('date') ||
-        className.includes('picker')
-      ) {
-        htmlInput.focus();
-        htmlInput.click();
-        return true;
-      }
+  // FINAL FALLBACK: Use Playwright locator with force click (no scrolling)
+  const dateInput = page.locator('input[placeholder*="DD/MM/YYYY" i], input[placeholder*="dd/mm/yyyy" i], input[type="date"]').first();
+  if (await dateInput.count() > 0) {
+    try {
+      await expect(dateInput).toBeVisible({ timeout: 10_000 });
+      // Use force click without scrolling
+      await dateInput.click({ force: true, timeout: 10_000 });
+      await page.waitForTimeout(1000);
+      if (await isCalendarOpen()) return;
+    } catch (e) {
+      console.log('Final fallback click failed');
     }
-    return false;
-  });
-
-  if (clicked) {
-    await page.waitForTimeout(1000);
-    if (await isCalendarOpen()) return;
   }
 
   // Final check - wait for calendar to appear
-  await expect(page.locator('.mat-calendar, .cdk-overlay-pane, .mat-datepicker-content')).toBeVisible({ timeout: 15_000 });
+  try {
+    // Do NOT use expect(locator).toBeVisible() on a locator that can resolve to multiple elements
+    // (strict mode violation). Instead poll our computed "isCalendarOpen" signal.
+    await expect
+      .poll(async () => await isCalendarOpen(), { timeout: 15_000 })
+      .toBeTruthy();
+    console.log('Calendar appeared successfully');
+    return;
+  } catch (error) {
+    console.error('Calendar did not appear after all attempts:', error);
+    throw new Error(`Failed to open date picker calendar: ${error}`);
+  }
 }
 
 /**
@@ -328,10 +429,19 @@ async function openDatePicker(page: Page): Promise<void> {
  * The calendar popup is rendered in cdk-overlay-container
  */
 async function selectDateInMaterialCalendar(page: Page, year: number, month: string, day: number): Promise<void> {
+  console.log(`Starting date selection: ${day} ${month} ${year}`);
+  
   // The calendar is rendered inside the overlay container
   const overlay = page.locator('.cdk-overlay-container');
   const calendar = overlay.locator('.mat-calendar, .mat-datepicker-content').first();
-  await expect(calendar).toBeVisible({ timeout: 10_000 });
+  
+  try {
+    await expect(calendar).toBeVisible({ timeout: 10_000 });
+    console.log('Calendar overlay is visible');
+  } catch (error) {
+    console.error('Calendar overlay not visible:', error);
+    throw new Error(`Calendar overlay not visible: ${error}`);
+  }
 
   // Click the period button to switch to year/multi-year view
   // This button shows current month/year like "FEBRUARY 2041"
@@ -400,11 +510,15 @@ async function selectDateInMaterialCalendar(page: Page, year: number, month: str
     }, { targetDay: day, targetMonth: month, targetYear: year });
     
     if (!clicked) {
+      console.error(`Could not find enabled date cell for ${day} ${month} ${year}`);
       throw new Error(`Could not find enabled date cell for ${day} ${month} ${year}`);
+    } else {
+      console.log(`Date cell clicked successfully via JavaScript`);
     }
   }
 
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(1000);
+  console.log('Date selection completed');
 }
 
 /**

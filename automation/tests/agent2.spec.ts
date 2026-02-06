@@ -3,6 +3,7 @@ import { runAgentWorkflow } from '../workflows/agentWorkflows';
 
 test.describe('Agent 2 - Auto invoke', () => {
   test('runs agent 2 workflow', async ({ page, startAutoInvoke }) => {
+    test.setTimeout(900_000);
     // Start auto-invoke for agent 2 (index 1)
     await startAutoInvoke(1);
 

@@ -1,42 +1,35 @@
-#Automation: Quick Start Guide
-This guide provides the essential commands to set up the environment, start the local server, and execute the Playwright test suites.
+# Qi UI Automation (Playwright)
 
-🛠️ Installation & Setup
-Run these commands to prepare your local environment and install necessary dependencies.
+Run intake-agent automation tests via a simple dashboard or the CLI.
 
-Bash
-# Install project dependencies
+## Setup
+
+```bash
 npm install
-
-# Install Playwright browser binaries
 npx playwright install
+```
 
-# Install server-side dependencies (Express & CORS)
-npm install express cors
-🌐 Starting the Server
-Before running the tests, ensure the backend/mock server is active:
 
-Bash
+## Run via dashboard 
+
+```bash
 node server.js
-🚀 Commands to Run Tests
-Running Specific Tests
-To execute a specific agent workflow in headed mode (visible browser):
+```
 
-Bash
-npx playwright test automation/tests/agent1.spec.ts --headed
-Running the Full Suite
-To execute all test cases in the repository:
+- Open: `http://localhost:3001/`
+- Use:
+  - **Run Test**: runs the selected agent flow (headed)
+  - **Run All Tests**: runs the full suite (headed)
+  - **Report**: opens the latest Playwright HTML report
 
-Bash
-npm test
-🔍 Debugging & UI Mode
-Use these commands to visualize the test execution or troubleshoot failures:
+## Run via CLI 
 
-Headed Mode: Runs tests in a visible browser window.
+```bash
+npm run test:headed -- --project=chromium
+```
 
-Bash
-npm run test:headed
-UI Mode: Opens the Playwright Test Runner for interactive debugging and time-travel tracing.
+## Debug (UI mode)
 
-Bash
+```bash
 npm run test:ui
+```
