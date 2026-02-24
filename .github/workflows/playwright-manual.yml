@@ -47,18 +47,14 @@ jobs:
         run: npm ci
 
       - name: Validate required secrets
-        shell: bash
         run: |
-          missing=0
-          for k in BASE_URL QUBE_MESH_URL USER_ID PASSWORD; do
-            if [ -z "${!k}" ]; then
-              echo "::error::Missing required secret/env: $k"
-              missing=1
-            fi
-          done
-          if [ "$missing" -ne 0 ]; then
-            exit 1
-          fi
+          err=0
+          if [ -z "$BASE_URL" ]; then echo "::error::Missing secret: BASE_URL"; err=1; fi
+          if [ -z "$QUBE_MESH_URL" ]; then echo "::error::Missing secret: QUBE_MESH_URL"; err=1; fi
+          if [ -z "$USER_ID" ]; then echo "::error::Missing secret: USER_ID"; err=1; fi
+          if [ -z "$PASSWORD" ]; then echo "::error::Missing secret: PASSWORD"; err=1; fi
+          if [ "$err" -ne 0 ]; then exit 1; fi
+          echo "All secrets present."
 
       - name: Run tests
         run: |
