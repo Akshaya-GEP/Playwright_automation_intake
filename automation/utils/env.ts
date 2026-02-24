@@ -2,6 +2,12 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+export const REQUIRED_ENV_VARS = ['BASE_URL', 'USER_ID', 'PASSWORD', 'QUBE_MESH_URL'] as const;
+
+export function getMissingRequiredEnvVars(): string[] {
+  return REQUIRED_ENV_VARS.filter((k) => !(process.env[k] || '').trim());
+}
+
 function required(name: string): string {
   const v = process.env[name];
   if (!v) throw new Error(`Missing required env var: ${name}`);
@@ -18,43 +24,43 @@ export type EnvConfig = {
   userId: string;
   password: string;
   qubeMeshUrl: string;
-  
+
   // Queries
   userQuery: string;
   userQuery2: string;
   userQuery3: string;
-  userQuery4: string; 
+  userQuery4: string;
   userQuery1_3?: string;
 
   // Agent Specific Params
   reasonOffboard?: string;
   reasonAmend?: string;
-  reasonAmend2?: string; 
+  reasonAmend2?: string;
   terminationStatus?: string;
-  terminationStatus3?: string; 
-  terminationStatus3_1?: string; 
-  terminationDate3?: string; 
-  terminationYear3?: string; 
-  terminationMonth3?: string; 
-  terminationDay3?: string; 
+  terminationStatus3?: string;
+  terminationStatus3_1?: string;
+  terminationDate3?: string;
+  terminationYear3?: string;
+  terminationMonth3?: string;
+  terminationDay3?: string;
   reasonTerminate?: string;
-  reasonTerminate3?: string; 
-  reasonTerminate3_1?: string; 
+  reasonTerminate3?: string;
+  reasonTerminate3_1?: string;
   supplierName?: string;
   supplierCode?: string;
 
   // Agent 4 Specifics
   reasonForExtension?: string;
-  reasonForExtension2?: string; 
+  reasonForExtension2?: string;
   modifications?: string;
-  extensionDate4?: string; 
-  extensionYear4?: string; 
-  extensionMonth4?: string; 
-  extensionDay4?: string; 
-  updateOption?: string; 
-  currency?: string; 
-  estimatedCost?: string; 
-  approval?: string; 
+  extensionDate4?: string;
+  extensionYear4?: string;
+  extensionMonth4?: string;
+  extensionDay4?: string;
+  updateOption?: string;
+  currency?: string;
+  estimatedCost?: string;
+  approval?: string;
 
   // Agent 1.1 (Adobe) Specifics
   userQueryAdobe?: string;
@@ -72,11 +78,11 @@ export type EnvConfig = {
   userQuery5?: string;
   supplierName5?: string;
   supplierCode5?: string;
-  updateType5?: string; 
+  updateType5?: string;
   updateType5_2?: string; // TC2
-  reasonAction5?: string; 
+  reasonAction5?: string;
   reasonAction5_2?: string; // TC2
-  uploadFile5?: string; 
+  uploadFile5?: string;
 
   agents: [string, string, string, string, string];
 };
@@ -101,9 +107,9 @@ export function getEnv(): EnvConfig {
   const terminationStatus = optional('TERMINATION_STATUS');
   const terminationStatus3 = optional('TERMINATION_STATUS_3');
   const terminationStatus3_1 = optional('TERMINATION_STATUS_3_1');
-  const terminationDate3 = optional('TERMINATION_DATE_3'); 
+  const terminationDate3 = optional('TERMINATION_DATE_3');
   const terminationYear3 = optional('TERMINATION_YEAR_3');
-  const terminationMonth3 = optional('TERMINATION_MONTH_3'); 
+  const terminationMonth3 = optional('TERMINATION_MONTH_3');
   const terminationDay3 = optional('TERMINATION_DAY_3');
   const reasonTerminate = optional('REASON_TERMINATE');
   const reasonTerminate3 = optional('REASON_TERMINATE_3');
@@ -113,11 +119,11 @@ export function getEnv(): EnvConfig {
 
   // Agent 4 Optional Params
   const reasonForExtension = optional('reasonForExtension') || optional('REASON_FOR_EXTENSION');
-  const reasonForExtension2 = optional('REASON_FOR_EXTENSION_2'); 
+  const reasonForExtension2 = optional('REASON_FOR_EXTENSION_2');
   const modifications = optional('modifications') || optional('MODIFICATIONS');
-  const extensionDate4 = optional('EXTENSION_DATE_4'); 
+  const extensionDate4 = optional('EXTENSION_DATE_4');
   const extensionYear4 = optional('EXTENSION_YEAR_4');
-  const extensionMonth4 = optional('EXTENSION_MONTH_4'); 
+  const extensionMonth4 = optional('EXTENSION_MONTH_4');
   const extensionDay4 = optional('EXTENSION_DAY_4');
   const updateOption = optional('update_option') || optional('UPDATE_OPTION');
   const currency = optional('currency') || optional('CURRENCY');
@@ -171,7 +177,7 @@ export function getEnv(): EnvConfig {
   }
 
   const agents = merged as [string, string, string, string, string];
-  
+
   return {
     baseURL,
     userId,
@@ -184,7 +190,7 @@ export function getEnv(): EnvConfig {
     userQuery1_3,
     reasonOffboard,
     reasonAmend,
-    reasonAmend2, 
+    reasonAmend2,
     terminationStatus,
     terminationStatus3,
     terminationStatus3_1,
@@ -198,7 +204,7 @@ export function getEnv(): EnvConfig {
     supplierName,
     supplierCode,
     reasonForExtension,
-    reasonForExtension2, 
+    reasonForExtension2,
     modifications,
     extensionDate4,
     extensionYear4,

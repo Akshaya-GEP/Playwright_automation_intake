@@ -1,22 +1,19 @@
 import { test } from '../fixtures/testFixtures';
-import { runAgentWorkflow } from '../workflows/agentWorkflows';
-import { getEnv } from '../utils/env';
+import { workflowAgent4 } from '../workflows/agent4';
+import { getContractExtensionRow } from '../test-data/contractExtensionData';
 
 test.describe('Agent 4 - Contract Extension', () => {
-  test('runs contract extension workflow', async ({ page, startAutoInvoke }) => {
+  test('runs contract extension workflow', async ({ page, qubeMeshPage }) => {
     test.setTimeout(900_000);
-    const env = getEnv();
+    // Auto Invoke / agent selection removed: start by typing into "Ask me anything".
+    void qubeMeshPage;
 
-    // 1. Authentication is handled by fixtures (global setup)
-
-    // 2. Start auto-invoke
-    // Assuming Agent 4 is at index 3. Adjust if your grid layout differs.
-    await startAutoInvoke(3); 
-
-    // 3. Run the agent-specific workflow
-    await runAgentWorkflow(page, { 
-      agentName: env.agents[3], 
-      agentIndex: 3 
-    });
+    const data = getContractExtensionRow('4');
+    const ctx = {
+      agentIndex: 3,
+      agentName: 'Agent 4',
+      isParallel: false
+    };
+    await workflowAgent4(page, ctx, data);
   });
 });

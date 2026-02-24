@@ -1,19 +1,20 @@
-import { expect, type Locator, type Page } from '@playwright/test';
-import { getEnv } from '../utils/env';
+import { expect, type Page } from '@playwright/test';
 import type { AgentContext } from './types';
 import { waitForAiEvents } from './aiEvents';
-import { escapeRegex, finalizeRequestFlow } from './utils';
+import { finalizeRequestFlow } from './utils';
+import type { SupplierOffboardingRow } from '../test-data/supplierOffboardingData';
+import {
+  selectOffboardingReason,
+} from './supplierOffboardingActions';
+import { clickCreateRequest, clickProceed, clickProceedWithRequest, enterPromptAndSubmit, getAskMeAnythingField } from './uiActions';
 
 /**
  * Agent 1: Supplier Offboarding
  * Flow: Search -> Select First Supplier from Grid -> Select Reason -> Create
  */
-export async function workflowAgent1(page: Page, _ctx: AgentContext) {
-  const env = getEnv();
-  
-  // Data from Env
-  const query = env.userQuery || "i want to offboard supplier microsoft";
-  const targetReason = env.reasonOffboard || "Not approved by TPRM";
+export async function workflowAgent1(page: Page, _ctx: AgentContext, data: SupplierOffboardingRow) {
+  const query = data.query;
+  const targetReason = data.offboardReason || 'Not approved by TPRM';
 
   const askField = getAskMeAnythingField(page);
   let aiEventsCount: number | null = null;
@@ -21,10 +22,7 @@ export async function workflowAgent1(page: Page, _ctx: AgentContext) {
   try {
     // --- Step 1: Initial Query ---
     console.log(`Starting Agent 1 Flow with Query: ${query}`);
-    await expect(askField).toBeVisible({ timeout: 180_000 });
-    await askField.fill(query);
-    await askField.press('Enter').catch(() => {});
-    aiEventsCount = await waitForAiEvents(page, aiEventsCount);
+    aiEventsCount = await enterPromptAndSubmit(page, query, aiEventsCount);
 
     // --- Step 2: Grid Selection ---
     // Grid of suppliers: select the first checkbox shown, then click Proceed.
@@ -60,9 +58,7 @@ export async function workflowAgent1(page: Page, _ctx: AgentContext) {
         await page.keyboard.press('Space').catch(() => {});
       });
 
-    await expect(proceed).toBeEnabled({ timeout: 30_000 });
-    await proceed.click();
-    aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
+    aiEventsCount = await clickProceed(page, aiEventsCount);
 
     // --- Step 3: Verification & Proceed ---
     // After "Proceed", some flows show a "Proceed with request" confirmation. Others go directly to reason options.
@@ -77,54 +73,23 @@ export async function workflowAgent1(page: Page, _ctx: AgentContext) {
     ]);
 
     if (await proceedWithRequest.first().isVisible().catch(() => false)) {
-      await expect(proceedWithRequest.first()).toBeEnabled({ timeout: 120_000 });
-      await proceedWithRequest.first().click({ timeout: 30_000 });
-      aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
+      aiEventsCount = await clickProceedWithRequest(page, aiEventsCount);
     }
 
     // --- Step 4: Select Offboarding Reason ---
-    // Reason buttons
-    const reasonTextRaw = env.reasonOffboard?.trim();
-    const reasonButtons = page
-      .getByRole('button', {
-        name: /no longer doing business|not approved by tprm|quick setup and pay/i
-      })
-      .or(page.getByRole('button').filter({ hasText: /no longer doing business|not approved by tprm|quick setup and pay/i }));
-
-    await expect.poll(async () => await reasonButtons.count(), { timeout: 120_000 }).toBeGreaterThan(0);
-
-    if (reasonTextRaw) {
-      const reasonPattern = escapeRegex(reasonTextRaw).replace(/\\\s+/g, '\\s+');
-      const reasonRe = new RegExp(reasonPattern, 'i');
-
-      const desiredButton = page
-        .getByRole('button', { name: reasonRe })
-        .or(page.getByRole('button').filter({ hasText: reasonRe }))
-        .first();
-
-      if (await desiredButton.count()) {
-        await desiredButton.click({ timeout: 30_000 });
-      } else {
-        await reasonButtons.first().click({ timeout: 30_000 });
-      }
-    } else {
-      await reasonButtons.first().click({ timeout: 30_000 });
-    }
-    aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
+    aiEventsCount = await selectOffboardingReason(page, targetReason, aiEventsCount);
 
     // --- Step 5: Create Request ---
     // Next: click "create request"
     console.log('Clicking Create Request button...');
-    const createRequest = page.getByRole('button', { name: /create request/i });
-    await expect(createRequest).toBeEnabled();
-    await createRequest.click();
-    aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
+    aiEventsCount = await clickCreateRequest(page, aiEventsCount);
     console.log('Create Request button clicked, waiting for final request screen...');
     await page.waitForTimeout(2000); // Wait for UI to update after Create Request
 
     // Standard end condition for all flows
     const end = await finalizeRequestFlow(page);
     console.log(`✅ Finalized flow. Ended by: ${end.endedBy}`);
+    return end;
 
   } catch (error) {
     console.error("❌ Workflow failed!", error);
@@ -134,11 +99,4 @@ export async function workflowAgent1(page: Page, _ctx: AgentContext) {
   }
 }
 
-// --- Local Helper ---
-function getAskMeAnythingField(page: Page): Locator {
-  return page
-    .getByRole('textbox', { name: /^prompt$/i })
-    .or(page.getByRole('textbox', { name: /prompt|ask me anything/i }))
-    .or(page.getByPlaceholder(/ask me anything/i))
-    .or(page.getByLabel(/ask me anything/i));
-}
+// getAskMeAnythingField moved to `supplierOffboardingActions.ts`

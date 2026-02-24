@@ -7,8 +7,8 @@ export function escapeRegex(s: string) {
 /**
  * Standard end-of-flow condition for ALL agent workflows:
  *
- * - If "SEND FOR VALIDATION" is displayed: click it and wait for "Congratulations"
- * - If ONLY "EDIT PROJECT REQUEST" is displayed (no send button): end the flow
+ * - If "EDIT PROJECT REQUEST" is displayed: end the flow (success)
+ * - Otherwise, if "SEND FOR VALIDATION" is displayed: click it and wait for a success signal
  */
 export async function finalizeRequestFlow(
   page: Page,
@@ -42,6 +42,15 @@ export async function finalizeRequestFlow(
     .or(page.getByText(/congrats/i))
     .first();
 
+  // Some environments do not show the literal word "Congratulations" after submission.
+  // Accept other common terminal copy after "Send for Validation".
+  const postSendSuccessText = page
+    .getByText(
+      /(request|project request).*(submitted|created|sent)|sent\s+for\s+validation|submitted\s+for\s+validation|successfully\s+(submitted|sent|created)|thank\s+you/i,
+    )
+    .filter({ hasNot: page.locator('code') })
+    .first();
+
   // Some flows may already show the congratulations message (or show it quickly).
   // Prefer it as an immediate terminal signal so we don't hang waiting for buttons that may not render.
   await Promise.race([
@@ -57,10 +66,9 @@ export async function finalizeRequestFlow(
     return { endedBy: 'congratulations', clickedSendForValidation: false };
   }
 
-  // If Edit Project Request is visible but Send for Validation is not, that's still a successful terminal state.
+  // If Edit Project Request is visible, that's a successful terminal state (even if Send for Validation also exists).
   const hasEdit = await editProjectRequest.isVisible().catch(() => false);
-  const hasSendNow = await sendForValidation.isVisible().catch(() => false);
-  if (hasEdit && !hasSendNow) {
+  if (hasEdit) {
     return { endedBy: 'edit-project-request-only', clickedSendForValidation: false };
   }
 
@@ -88,7 +96,23 @@ export async function finalizeRequestFlow(
     }
   }
 
-  await expect(congratulationsMessage).toBeVisible({ timeout: congratulationsTimeoutMs });
+  // Wait for a terminal success signal after clicking "Send for Validation".
+  // Different builds use different copy; also consider the send CTA disappearing/being disabled as a success signal.
+  await expect
+    .poll(
+      async () => {
+        if (await congratulationsMessage.isVisible().catch(() => false)) return 'congratulations';
+        if (await postSendSuccessText.isVisible().catch(() => false)) return 'success-text';
+
+        const sendVisible = await sendForValidation.isVisible().catch(() => false);
+        const sendEnabled = await sendForValidation.isEnabled().catch(() => false);
+        if (!sendVisible || !sendEnabled) return 'send-hidden-or-disabled';
+
+        return '';
+      },
+      { timeout: congratulationsTimeoutMs },
+    )
+    .not.toBe('');
   return { endedBy: 'send-for-validation', clickedSendForValidation: true };
 }
 

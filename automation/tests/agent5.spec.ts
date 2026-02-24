@@ -1,12 +1,21 @@
-import { test, expect } from '../fixtures/testFixtures';
-import { runAgentWorkflow } from '../workflows/agentWorkflows';
+import { test } from '../fixtures/testFixtures';
+import { workflowAgent5 } from '../workflows/agent5';
+import { getSupplierProfileUpdateRow } from '../test-data/supplierProfileUpdateData';
 
-test.describe('Agent 5 - Auto invoke', () => {
-  test('runs agent 5 workflow', async ({ page, startAutoInvoke }) => {
-    // Start auto-invoke for agent 5 (index 4)
-    await startAutoInvoke(4);
+test.describe('Agent 5 - Supplier Profile Update', () => {
+    test('runs agent 5 workflow', async ({ page, qubeMeshPage }) => {
+        test.setTimeout(900_000);
+        // Auto Invoke / agent selection removed: start by typing into "Ask me anything".
+        void qubeMeshPage;
 
-    // Run the agent-specific workflow
-    await runAgentWorkflow(page, { agentName: 'Agent 5', agentIndex: 4 });
-  });
+        const data = getSupplierProfileUpdateRow('5');
+        const ctx = {
+            agentIndex: 4,
+            agentName: 'Agent 5',
+            isParallel: false,
+        };
+        await workflowAgent5(page, ctx);
+    });
 });
+
+

@@ -1,11 +1,11 @@
 import { test as base, type Page } from '@playwright/test';
 import { QubeMeshPage } from '../pages/qubeMeshPage';
-import { getEnv } from '../utils/env';
+import { getEnv, getMissingRequiredEnvVars } from '../utils/env';
 
 /**
  * Extended test fixtures that provide:
  * - `qubeMeshPage`: A QubeMeshPage instance already navigated to the QubeMesh URL
- * - `autoInvokePage`: A page with auto-invoke already started
+ * - `startAutoInvoke`: (legacy) kept for backward compatibility; it no longer starts Auto Invoke
  */
 export type TestFixtures = {
   qubeMeshPage: QubeMeshPage;
@@ -17,7 +17,16 @@ export const test = base.extend<TestFixtures>({
    * Provides a QubeMeshPage instance already navigated to the QubeMesh URL.
    * Uses the authenticated session from auth.setup.ts.
    */
-  qubeMeshPage: async ({ page }, use) => {
+  qubeMeshPage: async ({ page }, use, testInfo) => {
+    const missing = getMissingRequiredEnvVars();
+    if (missing.length) {
+      // Skip the test run cleanly instead of failing deep inside setup/workflows.
+      // (Login requires these env vars and we can't guess credentials.)
+      testInfo.skip(
+        true,
+        `Missing required env vars: ${missing.join(', ')}. Create a .env file (see .env.example) before running Playwright.`,
+      );
+    }
     const env = getEnv();
     const qubeMeshPage = new QubeMeshPage(page);
     await qubeMeshPage.goto(env.qubeMeshUrl);
@@ -25,10 +34,19 @@ export const test = base.extend<TestFixtures>({
   },
 
   /**
-   * Provides a function to start auto-invoke for a specific agent.
-   * Call this at the beginning of your test with the agent index.
+   * Legacy helper kept to avoid updating older specs in bulk.
+   *
+   * **Behavior change**: this no longer clicks "Auto Invoke" or selects an agent.
+   * Workflows should type directly into the "Ask me anything" field.
    */
-  startAutoInvoke: async ({ page }, use) => {
+  startAutoInvoke: async ({ page }, use, testInfo) => {
+    const missing = getMissingRequiredEnvVars();
+    if (missing.length) {
+      testInfo.skip(
+        true,
+        `Missing required env vars: ${missing.join(', ')}. Create a .env file (see .env.example) before running Playwright.`,
+      );
+    }
     const env = getEnv();
     const qubeMeshPage = new QubeMeshPage(page);
 
@@ -36,9 +54,8 @@ export const test = base.extend<TestFixtures>({
     await qubeMeshPage.goto(env.qubeMeshUrl);
 
     const startAutoInvokeForAgent = async (agentIndex: 0 | 1 | 2 | 3 | 4) => {
-      const agentName = env.agents[agentIndex];
-      await qubeMeshPage.startAutoInvoke();
-      await qubeMeshPage.setAgentName(agentName);
+      // Intentionally ignore agentIndex: no auto-invoke, no agent selection.
+      void agentIndex;
     };
 
     await use(startAutoInvokeForAgent);

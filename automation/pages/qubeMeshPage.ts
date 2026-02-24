@@ -29,15 +29,17 @@ export class QubeMeshPage {
         url.host === target.host &&
         url.pathname.startsWith(target.pathname) &&
         (target.hash ? url.hash.startsWith(target.hash) : true),
-      { timeout: timeoutMs }
+      // SPAs often keep the page in a state where the `load` event never fires reliably.
+      // Match the navigation but only wait for DOMContentLoaded.
+      { timeout: timeoutMs, waitUntil: 'domcontentloaded' }
     );
 
     // Give the app a moment to render the Qube Mesh UI.
     await this.page.waitForLoadState('domcontentloaded');
 
-    // If the Auto Invoke control exists, wait for it to become available.
+    // Primary entrypoint: the query textbox should be available without selecting an agent.
     // (We intentionally don't wait for `networkidle`; Qube Mesh may keep connections open.)
-    await this.getAutoInvokeButton().first().waitFor({ state: 'visible', timeout: timeoutMs }).catch(() => {});
+    await this.userQueryInput.first().waitFor({ state: 'visible', timeout: timeoutMs });
   }
 
   async startAutoInvoke() {

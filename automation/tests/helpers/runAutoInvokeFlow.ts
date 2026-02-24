@@ -12,9 +12,8 @@ export async function runAutoInvokeFlow(page: Page, agentIndex: 0 | 1 | 2 | 3 | 
 
   const qubeMesh = new QubeMeshPage(page);
   await qubeMesh.goto(env.qubeMeshUrl);
-
-  await qubeMesh.startAutoInvoke();
-  await qubeMesh.setAgentName(agentName);
+  // Temporary behavior change: do NOT start Auto Invoke or select a specific agent.
+  // Workflows will type directly into "Ask me anything" without agent selection.
 
   // Agent-specific steps go here (you'll provide the details next).
   await runAgentWorkflow(page, { agentName, agentIndex });

@@ -1,0 +1,3 @@
+Sno,Query,TerminationStatus,TerminationDate,ReasonTerminate
+3,Terminate contract CDR0007483,future,2026-08-15,Termination for Cause - Service Related
+3.1,Terminate contract CDR0007483,immediate,,Termination of Convenience

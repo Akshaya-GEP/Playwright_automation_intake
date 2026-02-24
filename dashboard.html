@@ -1,306 +1,1311 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Automation Dashboard</title>
+    <title>Automation Runner Dashboard</title>
     <style>
         :root {
-            --btn-blue-bg: #d9e7ff;
-            --btn-blue-border: #b8cff7;
-            --btn-blue-hover: #c7dcff;
-            --btn-green-bg: #d6f5e3;
-            --btn-green-border: #a7e2c2;
-            --btn-green-hover: #c3f0d5;
-            --btn-text: #1f2a37;
+            /* Typography */
+            --font-sans: "Segoe UI Variable", "Segoe UI", Inter, ui-sans-serif, system-ui, -apple-system, Roboto, Helvetica, Arial, "Apple Color Emoji",
+                "Segoe UI Emoji";
+            --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+            /* Light mode */
+            --bg0: #f6f7fb;
+            --bg1: #ffffff;
+            --panel: rgba(255, 255, 255, 0.92);
+            --panel2: rgba(249, 250, 251, 1);
+            --border: rgba(17, 24, 39, 0.10);
+            --text: #0f172a;
+            --muted: rgba(15, 23, 42, 0.70);
+            --muted2: rgba(15, 23, 42, 0.58);
+            --shadow: 0 16px 50px rgba(15, 23, 42, 0.12);
+
+            /* Accent (light blue) */
+            --primary: #2563eb;
+            --primary2: #60a5fa;
+            --primary-rgb: 37, 99, 235;
+            --primary2-rgb: 96, 165, 250;
+            --ok: #22c55e;
+            --warn: #f59e0b;
+            --bad: #ef4444;
+            --info: #38bdf8;
+
+            --btn-bg: rgba(255, 255, 255, 0.95);
+            --btn-hover: rgba(249, 250, 251, 1);
+            --btn-border: rgba(15, 23, 42, 0.16);
+            --focus: 0 0 0 3px rgba(59, 130, 246, 0.22);
         }
 
-        body { 
-            font-family: sans-serif; 
-            display: flex; 
-            justify-content: center; 
-            align-items: flex-start; 
-            min-height: 100vh; 
-            background-color: #f4f4f9; 
+        body {
             margin: 0;
-            padding-top: 80px;
+            min-height: 100vh;
+            color: var(--text);
+            font-family: var(--font-sans);
+            background:
+                radial-gradient(1000px 600px at 20% 0%, rgba(var(--primary-rgb), 0.12), transparent 62%),
+                radial-gradient(900px 500px at 80% 10%, rgba(var(--primary2-rgb), 0.12), transparent 60%),
+                radial-gradient(800px 500px at 50% 100%, rgba(34, 197, 94, 0.06), transparent 64%),
+                linear-gradient(180deg, var(--bg0), var(--bg1));
         }
 
-        .card { 
-            background: white; 
-            padding: 2rem; 
-            border-radius: 12px; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
-            width: 620px; 
-            text-align: center; 
+        .container {
+            /* Centered layout (avoid full-width stretch) */
+            width: 100%;
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 26px 18px 28px;
+            box-sizing: border-box;
         }
 
-        h2 { margin-top: 0; color: #333; }
-        p { color: #666; margin-bottom: 1.5rem; }
+        /* When sidebar is open, allow a wider container so the 70/30 split feels natural */
+        body.sidebar-open .container {
+            max-width: 1280px;
+        }
 
-        .input-group {
+        @media (max-width: 920px) {
+            .container {
+                padding: 22px 16px 22px;
+            }
+        }
+
+        .topbar {
             display: flex;
-            gap: 12px; 
+            align-items: flex-start;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        @media (max-width: 820px) {
+            .topbar {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+
+        .brand {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
             align-items: center;
-            margin-bottom: 20px;
+            text-align: center;
         }
 
-        select { 
-            flex: 2; 
-            padding: 14px; 
-            border-radius: 10px; 
-            border: 1px solid #ccc; 
-            font-size: 17px; 
-            background-color: white;
-            outline: none;
-            min-height: 48px;
+        .title {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: 0.2px;
+            margin: 0;
         }
 
-        button { 
-            flex: 1; 
-            padding: 14px; 
-            background-color: var(--btn-blue-bg);
-            color: var(--btn-text); 
-            border: 1px solid var(--btn-blue-border); 
-            border-radius: 10px; 
-            font-size: 17px; 
-            font-weight: bold;
-            cursor: pointer; 
-            transition: background 0.3s;
-            white-space: nowrap; 
-            min-height: 48px;
+        .subtitle {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.35;
+            max-width: 760px;
         }
 
-        button:hover { background-color: var(--btn-blue-hover); }
-        button:disabled { background-color: #eef2f7; border-color: #d5dbe6; color: #8b97a8; cursor: not-allowed; }
-
-        .btn-blue { background-color: var(--btn-blue-bg); border-color: var(--btn-blue-border); }
-        .btn-blue:hover { background-color: var(--btn-blue-hover); }
-        .btn-green { background-color: var(--btn-green-bg); border-color: var(--btn-green-border); }
-        .btn-green:hover { background-color: var(--btn-green-hover); }
-
-        /* Stack buttons vertically (Report below Run All Tests) */
-        .secondary-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            margin-top: -8px;
-            margin-bottom: 20px;
-        }
-
-        /* Smaller, non-primary action buttons */
-        .btn-small {
-            flex: 0 0 auto;
-            min-height: 40px;
-            padding: 10px 14px;
-            font-size: 14px;
-            border-radius: 10px;
-        }
-
-        optgroup { font-weight: bold; font-size: 15px; color: #333; }
-        
-        #status { 
-            margin-top: 15px; 
-            font-size: 14px; 
-            font-weight: 500;
-            min-height: 20px;
-        }
-
-        /* Optional helper buttons (non-mandatory) */
-        .debug-row {
-            margin-top: 10px;
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-        }
-        .debug-btn {
-            padding: 6px 10px;
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.85);
+            border: 1px solid rgba(15, 23, 42, 0.12);
+            border-radius: 999px;
+            padding: 10px 12px;
             font-size: 12px;
-            font-weight: 600;
-            background: #eef0f3;
-            color: #333;
-            border: 1px solid #d7dbe0;
-            border-radius: 6px;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        .pill strong {
+            color: var(--text);
+            font-weight: 700;
+        }
+
+        .page {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 14px;
+            align-items: start;
+            margin-bottom: 14px;
+        }
+
+        .main {
+            width: 100%;
+            max-width: 860px;
+            justify-self: center;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            align-items: stretch;
+        }
+
+        /* Split view: 70% main + 30% logs sidebar */
+        body.sidebar-open .page {
+            grid-template-columns: 70% 30%;
+        }
+
+        body.sidebar-open .main {
+            max-width: none;
+            justify-self: stretch;
+        }
+
+        @media (min-width: 1400px) {
+            .main {
+                max-width: 900px;
+                gap: 18px;
+            }
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        /* Layout wrappers are intentionally minimal; cards are stacked in .main */
+
+        /* Visual priority: primary vs secondary cards */
+        .card.primary {
+            border-color: rgba(var(--primary-rgb), 0.45);
+            box-shadow:
+                0 16px 50px rgba(15, 23, 42, 0.12),
+                0 0 0 1px rgba(var(--primary-rgb), 0.16),
+                0 0 34px rgba(var(--primary-rgb), 0.10);
+        }
+
+        /* Primary header: keep title centered, move Live logs toggle to the right */
+        .card.primary .card-title-row {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card.primary .card-title-row .card-title {
+            grid-column: 2;
+            text-align: center;
+        }
+
+        .card.primary .header-actions {
+            grid-column: 3;
+            justify-self: end;
+        }
+
+        @media (max-width: 560px) {
+            .card.primary .card-title-row {
+                grid-template-columns: 1fr;
+                justify-items: center;
+            }
+
+            .card.primary .card-title-row .card-title,
+            .card.primary .header-actions {
+                grid-column: 1;
+            }
+
+            .card.primary .header-actions {
+                justify-self: center;
+            }
+        }
+
+        .card.primary .card-desc {
+            text-align: center;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 64ch;
+        }
+
+        /* Center the suite card header text */
+        .suite-card .card-title-row {
+            justify-content: center;
+        }
+
+        .suite-card .card-desc {
+            text-align: center;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 64ch;
+        }
+
+        .suite-card .hint {
+            text-align: center;
+        }
+
+        /* Compact + centered agent select */
+        .agent-field {
+            flex: 0 1 auto !important;
+            width: min(420px, 100%);
+            min-width: 0 !important;
+        }
+
+        .agent-field label {
+            justify-content: center;
+            width: 100%;
+        }
+
+        .card.secondary {
+            border-color: rgba(15, 23, 42, 0.10);
+        }
+
+        .card-header {
+            padding: 14px 14px 0;
+        }
+
+        .card-title {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 0.2px;
+        }
+
+        .card-title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .header-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.2px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        .badge.primary {
+            border-color: rgba(var(--primary-rgb), 0.30);
+            background: rgba(var(--primary-rgb), 0.10);
+            color: #000;
+        }
+
+        .badge.secondary {
+            border-color: rgba(255, 255, 255, 0.14);
+            background: rgba(255, 255, 255, 0.05);
+            color: rgba(229, 231, 235, 0.80);
+        }
+
+        .card-desc {
+            margin: 7px 0 0;
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.35;
+        }
+
+        .card-body {
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .row.center {
+            justify-content: center;
+        }
+
+        .row-wrap {
+            flex-wrap: wrap;
+        }
+
+        label {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 6px;
+            display: inline-flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        /* Visually hidden (keeps accessibility for screen readers) */
+        .sr-only {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            padding: 0 !important;
+            margin: -1px !important;
+            overflow: hidden !important;
+            clip: rect(0, 0, 0, 0) !important;
+            white-space: nowrap !important;
+            border: 0 !important;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex: 1;
+            min-width: 220px;
+        }
+
+        select,
+        input[type="text"] {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(15, 23, 42, 0.14);
+            background: rgba(255, 255, 255, 0.98);
+            color: #000;
+            outline: none;
+            font-size: 14px;
+        }
+
+        select:focus,
+        input[type="text"]:focus,
+        button:focus {
+            box-shadow: var(--focus);
+            border-color: rgba(56, 189, 248, 0.6);
+        }
+
+        optgroup {
+            color: rgba(15, 23, 42, 0.92);
+            font-weight: 700;
+        }
+
+        option {
+            color: #0f172a;
+        }
+
+        .hint {
+            font-size: 12px;
+            color: var(--muted2);
+            line-height: 1.35;
+        }
+
+        .hint.compact {
+            margin-top: -2px;
+        }
+
+        .seg {
+            display: inline-flex;
+            border: 1px solid rgba(15, 23, 42, 0.12);
+            background: rgba(249, 250, 251, 1);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .seg button {
+            border: 0;
+            border-right: 1px solid rgba(15, 23, 42, 0.10);
+            background: transparent;
+            padding: 10px 12px;
+            font-size: 12px;
+            color: var(--muted);
             cursor: pointer;
+            min-height: unset;
+            border-radius: 0;
+        }
+
+        .seg button:last-child {
+            border-right: 0;
+        }
+
+        .seg button[aria-pressed="true"] {
+            color: var(--text);
+            background: rgba(var(--primary-rgb), 0.10);
+        }
+
+        /* Run mode toggle (primary section) */
+        .seg.runmode {
+            width: 100%;
+        }
+
+        .seg.runmode button {
+            flex: 1;
+            padding: 10px 12px;
+            font-size: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 2px;
+            line-height: 1.2;
+        }
+
+        .seg.runmode .rm-title {
+            font-weight: 850;
+            color: rgba(15, 23, 42, 0.86);
+        }
+
+        .seg.runmode button[aria-pressed="true"] .rm-title {
+            color: rgba(15, 23, 42, 0.96);
+        }
+
+        .seg.runmode .rm-desc {
+            font-size: 11px;
+            color: var(--muted2);
+        }
+
+        /* Compact "side" run mode toggle */
+        .seg.runmode.compact {
+            width: auto;
+            border-radius: 999px;
+        }
+
+        .seg.runmode.compact button {
+            flex: 0 0 auto;
+            padding: 8px 10px;
+            align-items: center;
+            border-radius: 0;
+        }
+
+        .seg.runmode.compact .rm-desc {
+            display: none;
+        }
+
+        .seg.runmode.compact .rm-title {
+            font-size: 12px;
+            font-weight: 850;
+        }
+
+        button {
+            padding: 12px 12px;
+            background: var(--btn-bg);
+            color: var(--text);
+            border: 1px solid var(--btn-border);
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 750;
+            cursor: pointer;
+            transition: transform 0.05s ease, background 0.15s ease, border 0.15s ease;
+            white-space: nowrap;
+            display: inline-flex;
+            gap: 8px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        button:hover {
+            background: var(--btn-hover);
+            border-color: rgba(15, 23, 42, 0.20);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+        }
+
+        .btn-ok {
+            background: rgba(34, 197, 94, 0.18);
+            border-color: rgba(34, 197, 94, 0.35);
+        }
+
+        .btn-ok:hover {
+            background: rgba(34, 197, 94, 0.24);
+        }
+
+        .btn-warn {
+            background: rgba(245, 158, 11, 0.18);
+            border-color: rgba(245, 158, 11, 0.35);
+        }
+
+        .btn-warn:hover {
+            background: rgba(245, 158, 11, 0.24);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.16);
+            border-color: rgba(239, 68, 68, 0.35);
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.22);
+        }
+
+        .statusbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding: 10px 14px;
+            border-top: 1px solid rgba(15, 23, 42, 0.08);
+            background: rgba(249, 250, 251, 1);
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.85);
+            box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.10);
             flex: 0 0 auto;
         }
-        .debug-btn:hover { background: #e3e7ec; }
+
+        .dot.ok {
+            background: rgba(34, 197, 94, 0.9);
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.14);
+        }
+
+        .dot.warn {
+            background: rgba(245, 158, 11, 0.95);
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.14);
+        }
+
+        .dot.bad {
+            background: rgba(239, 68, 68, 0.95);
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.14);
+        }
+
+        .status-text {
+            font-size: 12px;
+            color: var(--muted);
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .status-text strong {
+            color: var(--text);
+        }
+
+        .logs {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(15, 23, 42, 0.10);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        /* Logs sidebar (right) — split view on desktop */
+        .sidebar-backdrop {
+            display: none;
+        }
+
+        .sidebar {
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+
+            position: sticky;
+            top: 18px;
+            height: calc(100vh - 36px);
+
+            padding: 12px;
+            box-sizing: border-box;
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(15, 23, 42, 0.10);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+
+        body.sidebar-open .sidebar {
+            display: flex;
+        }
+
+        .sidebar-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 6px 2px 0;
+        }
+
+        .sidebar-title {
+            margin: 0;
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 0.2px;
+            color: rgba(15, 23, 42, 0.92);
+        }
+
+        .icon-btn {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sidebar .logs {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .sidebar pre {
+            max-height: none;
+            height: 100%;
+        }
+
+        /* Mobile: keep the slide-over drawer behavior */
+        @media (max-width: 980px) {
+            body.sidebar-open .page {
+                grid-template-columns: 1fr;
+            }
+
+            body.sidebar-open .container {
+                max-width: 1120px;
+            }
+
+            .sidebar-backdrop {
+                position: fixed;
+                inset: 0;
+                background: rgba(2, 6, 23, 0.32);
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.18s ease;
+            }
+
+            body.sidebar-open .sidebar-backdrop {
+                opacity: 1;
+                pointer-events: auto;
+                z-index: 49;
+                display: block;
+            }
+
+            .sidebar {
+                position: fixed;
+                top: 0;
+                right: 0;
+                height: 100vh;
+                width: min(520px, 92vw);
+                padding: 14px;
+                border-radius: 0;
+                border-top-left-radius: 16px;
+                border-bottom-left-radius: 16px;
+                border: 0;
+                border-left: 1px solid rgba(15, 23, 42, 0.10);
+                box-shadow: var(--shadow);
+
+                transform: translateX(102%);
+                transition: transform 0.18s ease;
+                pointer-events: none;
+                z-index: 50;
+
+                display: flex;
+            }
+
+            body.sidebar-open .sidebar {
+                transform: translateX(0);
+                pointer-events: auto;
+            }
+        }
+
+        .logs-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.10);
+            background: rgba(249, 250, 251, 1);
+        }
+
+        .logs-title {
+            margin: 0;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .logs-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .toggle {
+            display: inline-flex;
+            gap: 8px;
+            align-items: center;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .toggle input {
+            accent-color: var(--primary2);
+            transform: translateY(1px);
+        }
+
+        pre {
+            margin: 0;
+            padding: 12px 14px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            line-height: 1.45;
+            color: rgba(15, 23, 42, 0.92);
+            background: rgba(248, 250, 252, 1);
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow: auto;
+            /* Keep logs reasonably sized (scroll inside) */
+            max-height: 56vh;
+        }
+
+        .footer {
+            margin-top: 14px;
+            color: var(--muted2);
+            font-size: 12px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        @media (min-width: 1400px) {
+            .footer {
+                margin-top: 18px;
+            }
+        }
+
+        a {
+            color: rgba(56, 189, 248, 0.95);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        code {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.06);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            color: rgba(15, 23, 42, 0.86);
+        }
     </style>
 </head>
+
 <body>
+    <div class="container">
+        <div class="topbar">
+            <div class="brand">
+                <h1 class="title">Automation Runner</h1>
+                <p class="subtitle">
+                    Run Intake Agent flows from one dashboard. Use <strong>Live logs</strong> to see progress and
+                    <strong>Stop</strong>
+                    to cancel safely.
+                </p>
+            </div>
 
-<div class="card">
-    <h2>Intake Agents</h2>
-    <p>Select an agent to start the test flow.</p>
-    
-    <div class="input-group">
-        <select id="agentSelect">
-            <option value="" disabled selected>Select an Agent</option>
-            <optgroup label="Supplier Offboarding Assistant">
-                <option value="1">Supplier Offboarding Assistant-1</option>
-                <option value="1.1">Supplier Offboarding Assistant-2</option>
-                <option value="1.2">Supplier Offboarding Assistant-3</option>
-                <option value="1.3">Supplier Offboarding Assistant-4</option>
-            </optgroup>
-            <optgroup label="Contract Termination Assistant">
-                <option value="3">Contract Termination Assistant-1</option>
-                <option value="3.1">Contract Termination Assistant-2</option>
-            </optgroup>
-            <optgroup label="Contract Extension Assistant">
-                <option value="4">Contract Extension Assistant-1</option>
-                <option value="4.1">Contract Extension Assistant-2</option>
-            </optgroup>
-            <optgroup label="Contract Amendment Assistant">
-                <option value="2">Contract Amendment Assistant-1</option>
-                <option value="2.1">Contract Amendment Assistant-2</option>
-            </optgroup>
-            <optgroup label="Supplier Profile Update Assistant">
-                <option value="5">Supplier Profile Update Assistant-1</option>
-                <option value="5.1">Supplier Profile Update Assistant-2</option>
-            </optgroup>
-        </select>
+        </div>
 
-        <button onclick="runTest()" id="runBtn" class="btn-blue">Run Test</button>
+        <div class="page">
+            <div class="main">
+                <div class="card primary" id="runAgentsCard">
+                <div class="card-header">
+                    <div class="card-title-row">
+                        <h2 class="card-title">Run a single agent</h2>
+                        <div class="header-actions">
+                            <label class="toggle" title="Enable to stream progress and show the live log panel">
+                                <input type="checkbox" id="liveLogsToggle" />
+                                Live logs
+                            </label>
+                        </div>
+                    </div>
+                    <p class="card-desc">
+                        Select an agent and run its automated test in a visible browser.
+                    </p>
+                </div>
+                <div class="card-body">
+                    <div class="row row-wrap center">
+                        <div class="field agent-field">
+                            <label for="agentSelect" class="sr-only">Agent</label>
+                            <select id="agentSelect">
+                                <option value="" disabled selected>Select an Agent</option>
+                                <optgroup label="Supplier Offboarding Assistant">
+                                    <option value="1">1 — Supplier Offboarding (Microsoft)</option>
+                                    <option value="1.1">1.1 — Supplier Offboarding (Adobe)</option>
+                                    <option value="1.2">1.2 — Supplier Offboarding (Workday)</option>
+                                    <option value="1.3">1.3 — Supplier Offboarding (By supplier code)</option>
+                                </optgroup>
+                                <optgroup label="Contract Amendment Assistant">
+                                    <option value="2">2 — Contract Amendment</option>
+                                    <option value="2.1">2.1 — Contract Amendment (Alt)</option>
+                                </optgroup>
+                                <optgroup label="Contract Termination Assistant">
+                                    <option value="3">3 — Contract Termination (Future)</option>
+                                    <option value="3.1">3.1 — Contract Termination (Immediate)</option>
+                                </optgroup>
+                                <optgroup label="Contract Extension Assistant">
+                                    <option value="4">4 — Contract Extension</option>
+                                    <option value="4.1">4.1 — Contract Extension (Alt)</option>
+                                </optgroup>
+                                <optgroup label="Supplier Profile Update Assistant">
+                                    <option value="5">5 — Supplier Profile Update</option>
+                                    <option value="5.1">5.1 — Supplier Profile Update (TC2)</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row row-wrap center">
+                        <button type="button" onclick="runSelectedAgent()" id="runAgentBtn">
+                            ▶ Run selected agent
+                        </button>
+                        <button type="button" class="btn-danger" onclick="stopRun()" id="stopBtn" disabled>
+                            ■ Stop
+                        </button>
+
+                    </div>
+                </div>
+                <div class="statusbar">
+                    <span class="dot" id="statusDot"></span>
+                    <div class="status-text" id="statusText">
+                        Status: <strong>idle</strong>
+                    </div>
+                </div>
+                </div>
+
+            <div class="card secondary suite-card">
+                <div class="card-header">
+                    <div class="card-title-row">
+                        <h2 class="card-title">Run entire test suite</h2>
+                    </div>
+                    <p class="card-desc">Run all Playwright specs in <strong>headed</strong> or <strong>headless</strong> mode.</p>
+                </div>
+                <div class="card-body">
+                    <div class="row row-wrap center">
+                        <div class="seg runmode compact" role="group" aria-label="Suite run mode">
+                            <button id="suiteHeadedBtn" type="button" aria-pressed="true" onclick="setSuiteMode('headed')"
+                                title="Browser visible">
+                                <span class="rm-title">Headed</span>
+                            </button>
+                            <button id="suiteHeadlessBtn" type="button" aria-pressed="false" onclick="setSuiteMode('headless')"
+                                title="No browser UI">
+                                <span class="rm-title">Headless</span>
+                            </button>
+                        </div>
+                        <button type="button" class="btn-ok" onclick="runSuite()" id="runSuiteBtn" title="Run all Playwright tests">
+                            ▶ Run all tests
+                        </button>
+                    </div>
+                    <div class="hint">
+                        If Live logs is enabled, you’ll see streaming output and can Stop instantly.
+                    </div>
+                    <div class="row row-wrap center">
+                        <button type="button" onclick="openReport()" id="reportBtn" title="Open latest Playwright report">
+                            Report
+                        </button>
+                        <button type="button" onclick="startDebugUi()" id="debugBtn" title="Start Playwright UI mode on localhost:9323">
+                            Debug UI
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer">
+                <div>
+                    If a run hangs, click <strong>Stop</strong> to cancel the server-side process.
+                </div>
+                <div>
+                    Runner: <a href="/" id="dashboardLink">Dashboard</a> · <a href="/report/" target="_blank"
+                        rel="noopener noreferrer">Report</a>
+                </div>
+            </div>
+            </div>
+
+            <aside class="sidebar" id="logsSidebar" aria-label="Live logs sidebar" aria-hidden="true">
+                <div class="sidebar-head">
+                    <h3 class="sidebar-title">Live logs</h3>
+                    <button type="button" class="icon-btn" onclick="closeLogsSidebar()" aria-label="Close logs">
+                        ✕
+                    </button>
+                </div>
+                <div class="logs" role="region" aria-label="Live run logs">
+                    <div class="logs-head">
+                        <h3 class="logs-title">Output</h3>
+                        <div class="logs-actions">
+                            <label class="toggle" title="Automatically keep the newest lines in view">
+                                <input type="checkbox" id="autoScroll" checked />
+                                Auto-scroll
+                            </label>
+                            <button type="button" onclick="copyLogs()">Copy</button>
+                            <button type="button" onclick="clearLogs()">Clear</button>
+                        </div>
+                    </div>
+                    <pre id="logs" aria-live="polite"></pre>
+                </div>
+            </aside>
+        </div>
     </div>
 
-    <div id="status"></div>
+    <!-- Backdrop is only used on mobile (slide-over mode) -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeLogsSidebar()" aria-hidden="true"></div>
 
-    <div class="debug-row">
-        <button onclick="runAllTestsHeaded()" id="runAllBtn" class="btn-blue btn-small" title="Optional: run full suite (headed)">
-            Run All Tests
-        </button>
-        <button onclick="openReport()" id="reportBtn" class="btn-green btn-small" title="Optional: open latest Playwright report">
-            Report
-        </button>
-        <button class="debug-btn" onclick="startDebugUi()" id="debugBtn" title="Optional: opens Playwright UI mode for debugging">
-            Debug (UI)
-        </button>
-    </div>
-</div>
+    <script>
+        // If you open this file directly (file://), use the local runner server.
+        // If you open it via the runner server (http://localhost:3001/), use relative URLs.
+        const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:3001' : '';
+        let suiteMode = 'headed'; // 'headed' | 'headless'
+        let currentStream = null; // EventSource
+        let currentAbort = null; // AbortController for non-streaming fetch runs
+        let runStartMs = null;
 
-<script>
-    // If you open this file directly (file://), use the local runner server.
-    // If you open it via the runner server (http://localhost:3001/), use relative URLs.
-    const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:3001' : '';
+        const els = {
+            runAgentsCard: document.getElementById('runAgentsCard'),
+            statusDot: document.getElementById('statusDot'),
+            statusText: document.getElementById('statusText'),
+            logs: document.getElementById('logs'),
+            autoScroll: document.getElementById('autoScroll'),
+            liveLogsToggle: document.getElementById('liveLogsToggle'),
+            logsSidebar: document.getElementById('logsSidebar'),
+            sidebarBackdrop: document.getElementById('sidebarBackdrop'),
+            runAgentBtn: document.getElementById('runAgentBtn'),
+            stopBtn: document.getElementById('stopBtn'),
+            suiteHeadedBtn: document.getElementById('suiteHeadedBtn'),
+            suiteHeadlessBtn: document.getElementById('suiteHeadlessBtn'),
+            runSuiteBtn: document.getElementById('runSuiteBtn'),
+            reportBtn: document.getElementById('reportBtn'),
+            debugBtn: document.getElementById('debugBtn'),
+        };
 
-    function setStatus(text, color) {
-        const statusDiv = document.getElementById('status');
-        statusDiv.innerText = text;
-        statusDiv.style.color = color || '#333';
-    }
-
-    function setButtonsDisabled(disabled) {
-        const runBtn = document.getElementById('runBtn');
-        const runAllBtn = document.getElementById('runAllBtn');
-        const reportBtn = document.getElementById('reportBtn');
-        const debugBtn = document.getElementById('debugBtn');
-
-        runBtn.disabled = disabled;
-        runAllBtn.disabled = disabled;
-        reportBtn.disabled = disabled;
-        debugBtn.disabled = disabled;
-
-        runBtn.innerText = disabled ? "Running..." : "Run Test";
-        runAllBtn.innerText = disabled ? "Running..." : "Run All Tests";
-    }
-
-    async function runTest() {
-        const agentId = document.getElementById('agentSelect').value;
-
-        if (!agentId) {
-            setStatus("⚠️ Please select an agent first.", "red");
-            return;
+        function setStatus(kind, text) {
+            const dotClass = kind === 'ok' ? 'ok' : (kind === 'warn' ? 'warn' : (kind === 'bad' ? 'bad' : ''));
+            els.statusDot.className = `dot ${dotClass}`;
+            const dur = runStartMs ? ` · ${Math.round((Date.now() - runStartMs) / 1000)}s` : '';
+            els.statusText.innerHTML = `Status: <strong>${text}</strong>${dur}`;
         }
 
-        // Update UI to running state
-        setStatus("⏳ Running test... Please wait.", "blue");
-        setButtonsDisabled(true);
-
-        try {
-            const response = await fetch(`${API_BASE}/run-test`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ agentId })
-            });
-
-            const data = await response.json();
-            
-            if (response.ok && data.success) {
-                setStatus(`✅ ${data.message}`, "green");
-            } else {
-                setStatus(`❌ Error: ${data.error}`, "red");
+        function appendLog(line) {
+            const ts = new Date().toLocaleTimeString();
+            els.logs.textContent += `[${ts}] ${line}\n`;
+            if (els.autoScroll.checked) {
+                els.logs.scrollTop = els.logs.scrollHeight;
             }
-        } catch (error) {
-            setStatus("❌ Failed to connect to server.", "red");
-            console.error(error);
-        } finally {
-            // Restore button state
-            setButtonsDisabled(false);
         }
-    }
 
-    async function runAllTestsHeaded() {
-        setStatus("⏳ Running all tests ... Please wait.", "blue");
-        setButtonsDisabled(true);
+        function clearLogs() {
+            els.logs.textContent = '';
+        }
 
-        try {
-            const response = await fetch(`${API_BASE}/run-all-tests`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
+        function copyLogs() {
+            const text = els.logs.textContent || '';
+            if (!text.trim()) return;
+            navigator.clipboard.writeText(text).then(() => {
+                setStatus('ok', 'logs copied');
+                setTimeout(() => setStatus('', 'idle'), 1200);
+            }).catch(() => {
+                // fallback: select/copy
+                const sel = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(els.logs);
+                sel.removeAllRanges();
+                sel.addRange(range);
+                document.execCommand('copy');
+                sel.removeAllRanges();
             });
-
-            const data = await response.json();
-            if (response.ok && data.success) {
-                setStatus(`✅ ${data.message}`, "green");
-            } else {
-                setStatus(`❌ Error: ${data.error}`, "red");
-            }
-        } catch (error) {
-            setStatus("❌ Failed to connect to server.", "red");
-            console.error(error);
-        } finally {
-            setButtonsDisabled(false);
         }
-    }
 
-    async function openReport() {
-        setStatus("⏳ Opening report...", "blue");
-        try {
-            const statusResp = await fetch(`${API_BASE}/report-status`, { method: 'GET' });
-            const statusData = await statusResp.json().catch(() => ({}));
-            if (!statusResp.ok || !statusData.exists) {
-                setStatus("❌ Report not available yet. Run a test first to generate it.", "red");
+        function setButtonsRunning(running) {
+            const list = [
+                els.runAgentBtn,
+                els.suiteHeadedBtn,
+                els.suiteHeadlessBtn,
+                els.runSuiteBtn,
+                els.reportBtn,
+                els.debugBtn,
+                els.liveLogsToggle,
+            ];
+            list.forEach(b => b && (b.disabled = running));
+            els.stopBtn.disabled = !running;
+
+            if (!running) runStartMs = null;
+        }
+
+        function isLiveLogsEnabled() {
+            return !!els.liveLogsToggle?.checked;
+        }
+
+        function applySidebarState(open) {
+            document.body.classList.toggle('sidebar-open', !!open);
+            els.logsSidebar?.setAttribute('aria-hidden', open ? 'false' : 'true');
+            els.sidebarBackdrop?.setAttribute('aria-hidden', open ? 'false' : 'true');
+        }
+
+        function openLogsSidebar() {
+            if (els.liveLogsToggle) els.liveLogsToggle.checked = true;
+            applySidebarState(true);
+        }
+
+        function closeLogsSidebar() {
+            if (els.liveLogsToggle) els.liveLogsToggle.checked = false;
+            applySidebarState(false);
+        }
+
+        function setLiveLogsUi() {
+            // Live logs ON => show sidebar + use streaming mode
+            applySidebarState(isLiveLogsEnabled());
+        }
+
+        function setSuiteMode(mode) {
+            suiteMode = mode;
+            els.suiteHeadedBtn.setAttribute('aria-pressed', mode === 'headed' ? 'true' : 'false');
+            els.suiteHeadlessBtn.setAttribute('aria-pressed', mode === 'headless' ? 'true' : 'false');
+        }
+
+        function stopRun() {
+            // Always ask backend to stop too (covers both streaming and non-streaming runs)
+            fetch(`${API_BASE}/stop-run`, { method: 'POST' }).catch(() => { });
+
+            if (currentAbort) {
+                try { currentAbort.abort(); } catch { }
+                currentAbort = null;
+            }
+            if (currentStream) {
+                appendLog('Stopping run…');
+                currentStream.close();
+                currentStream = null;
+            }
+            setButtonsRunning(false);
+            setStatus('warn', 'stopped');
+        }
+
+        async function ensureServerUp() {
+            try {
+                const resp = await fetch(`${API_BASE}/report-status`, { method: 'GET' });
+                return resp.ok;
+            } catch {
+                return false;
+            }
+        }
+
+        async function runStream(url) {
+            // If a stream is open, stop it first (prevent multiple parallel runs)
+            if (currentStream) {
+                currentStream.close();
+                currentStream = null;
+            }
+
+            setButtonsRunning(true);
+            runStartMs = Date.now();
+            setStatus('warn', 'running');
+            clearLogs();
+
+            const ok = await ensureServerUp();
+            if (!ok) {
+                setButtonsRunning(false);
+                setStatus('bad', 'server offline');
+                appendLog('Could not reach runner server. Start it with: node server.js');
                 return;
             }
 
-            window.open(`${API_BASE}/report/index.html`, '_blank', 'noopener,noreferrer');
-            setStatus("✅ Report opened in a new tab.", "green");
-        } catch (error) {
-            setStatus("❌ Failed to connect to server.", "red");
-            console.error(error);
-        }
-    }
+            appendLog(`Streaming: ${url}`);
 
-    async function startDebugUi() {
-        setStatus("⏳ Starting Playwright UI mode...", "blue");
-        try {
-            const resp = await fetch(`${API_BASE}/debug-ui`, { method: 'POST' });
-            const data = await resp.json().catch(() => ({}));
-            if (!resp.ok) {
-                setStatus(`❌ ${data.error || 'Failed to start UI mode.'}`, "red");
+            const es = new EventSource(url);
+            currentStream = es;
+
+            es.addEventListener('start', (ev) => {
+                try {
+                    const payload = JSON.parse(ev.data || '{}');
+                    appendLog(`Command: ${payload.command || '(unknown)'}`);
+                } catch { }
+            });
+
+            es.addEventListener('line', (ev) => {
+                try {
+                    const payload = JSON.parse(ev.data || '{}');
+                    if (payload && payload.text) appendLog(payload.text);
+                } catch {
+                    appendLog(String(ev.data || ''));
+                }
+            });
+
+            es.addEventListener('done', (ev) => {
+                let success = false;
+                let code = null;
+                try {
+                    const payload = JSON.parse(ev.data || '{}');
+                    success = !!payload.success;
+                    code = payload.exitCode;
+                } catch { }
+
+                setButtonsRunning(false);
+                setStatus(success ? 'ok' : 'bad', success ? `done (exit ${code ?? 0})` : `failed (exit ${code ?? 1})`);
+                appendLog(`Run finished. exitCode=${code}`);
+                es.close();
+                currentStream = null;
+            });
+
+            es.addEventListener('error', (ev) => {
+                // In SSE, 'error' may fire on reconnect attempt as well; treat as fatal if readyState is CLOSED.
+                if (es.readyState === EventSource.CLOSED) {
+                    setButtonsRunning(false);
+                    setStatus('bad', 'stream error');
+                    appendLog('Stream closed unexpectedly.');
+                    currentStream = null;
+                }
+            });
+        }
+
+        async function runSelectedAgent() {
+            const agentId = document.getElementById('agentSelect').value;
+            if (!agentId) {
+                setStatus('bad', 'select an agent');
                 return;
             }
 
-            // UI mode typically runs on localhost:9323
-            const url = data.url || 'http://localhost:9323';
-            window.open(url, '_blank', 'noopener,noreferrer');
-            setStatus("✅ Debug UI started (opened in a new tab).", "green");
-        } catch (e) {
-            console.error(e);
-            setStatus("❌ Failed to connect to server.", "red");
+            if (!isLiveLogsEnabled()) {
+                // Non-streaming fallback (no live log panel)
+                setButtonsRunning(true);
+                runStartMs = Date.now();
+                setStatus('warn', 'running');
+                clearLogs();
+                try {
+                    currentAbort = new AbortController();
+                    const response = await fetch(`${API_BASE}/run-test`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ agentId }),
+                        signal: currentAbort.signal,
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (response.ok && data.success) {
+                        setStatus('ok', 'done');
+                        appendLog(data.message || 'Execution successful.');
+                    } else {
+                        setStatus('bad', 'failed');
+                        appendLog(data.error || 'Execution failed.');
+                    }
+                } catch (e) {
+                    if (e && e.name === 'AbortError') {
+                        // Stop was clicked; keep the UI as "stopped"
+                        return;
+                    }
+                    setStatus('bad', 'failed to connect');
+                    appendLog('Failed to connect to server.');
+                } finally {
+                    currentAbort = null;
+                    setButtonsRunning(false);
+                }
+                return;
+            }
+
+            const url = `${API_BASE}/stream-run-agent?agentId=${encodeURIComponent(agentId)}`;
+            return runStream(url);
         }
-    }
-</script>
+
+        async function runSuite() {
+            if (isLiveLogsEnabled()) {
+                if (suiteMode === 'headed') return runStream(`${API_BASE}/stream-run-headed`);
+                if (suiteMode === 'headless') return runStream(`${API_BASE}/stream-run-headless`);
+                return;
+            }
+
+            // Non-streaming fallback
+            setButtonsRunning(true);
+            runStartMs = Date.now();
+            setStatus('warn', 'running');
+            clearLogs();
+            try {
+                currentAbort = new AbortController();
+                const endpoint = (suiteMode === 'headed') ? '/run-all-tests-headed' : '/run-all-playwright';
+                const response = await fetch(`${API_BASE}${endpoint}`, { method: 'POST', signal: currentAbort.signal });
+                const data = await response.json().catch(() => ({}));
+                if (response.ok && data.success) {
+                    setStatus('ok', 'done');
+                    appendLog(data.message || 'Execution successful.');
+                } else {
+                    setStatus('bad', 'failed');
+                    appendLog(data.error || 'Execution failed.');
+                }
+            } catch (e) {
+                if (e && e.name === 'AbortError') {
+                    // Stop was clicked; keep the UI as "stopped"
+                    return;
+                }
+                setStatus('bad', 'failed to connect');
+                appendLog('Failed to connect to server.');
+            } finally {
+                currentAbort = null;
+                setButtonsRunning(false);
+            }
+        }
+
+        async function openReport() {
+            setStatus('warn', 'opening report');
+            try {
+                const statusResp = await fetch(`${API_BASE}/report-status`, { method: 'GET' });
+                const statusData = await statusResp.json().catch(() => ({}));
+                if (!statusResp.ok || !statusData.exists) {
+                    setStatus('bad', 'report not available');
+                    appendLog('Report not available yet. Run a test first to generate it.');
+                    return;
+                }
+
+                window.open(`${API_BASE}/report/index.html`, '_blank', 'noopener,noreferrer');
+                setStatus('ok', 'report opened');
+            } catch (error) {
+                setStatus('bad', 'failed to connect');
+                console.error(error);
+            }
+        }
+
+        async function startDebugUi() {
+            setStatus('warn', 'starting debug ui');
+            try {
+                const resp = await fetch(`${API_BASE}/debug-ui`, { method: 'POST' });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok) {
+                    setStatus('bad', data.error || 'failed to start ui');
+                    return;
+                }
+
+                // UI mode typically runs on localhost:9323
+                const url = data.url || 'http://localhost:9323';
+                window.open(url, '_blank', 'noopener,noreferrer');
+                setStatus('ok', 'debug ui started');
+            } catch (e) {
+                console.error(e);
+                setStatus('bad', 'failed to connect');
+            }
+        }
+
+        // Initial
+        setSuiteMode('headed');
+        setLiveLogsUi();
+        els.liveLogsToggle?.addEventListener('change', setLiveLogsUi);
+
+        // Close sidebar on ESC
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (document.body.classList.contains('sidebar-open')) {
+                    if (els.liveLogsToggle) els.liveLogsToggle.checked = false;
+                    setLiveLogsUi();
+                }
+            }
+        });
+    </script>
 
 </body>
+
 </html>

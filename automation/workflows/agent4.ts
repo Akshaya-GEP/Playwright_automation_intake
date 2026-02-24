@@ -3,6 +3,7 @@ import { getEnv } from '../utils/env';
 import type { AgentContext } from './types';
 import { waitForAiEvents } from './aiEvents';
 import { finalizeRequestFlow } from './utils';
+import { enterPromptAndSubmit } from './uiActions';
 
 /**
  * Contract Extension Workflow (Agent 4)
@@ -24,11 +25,8 @@ export async function workflowAgent4(page: Page, _ctx: AgentContext) {
   let aiEventsCount: number | null = null;
 
   // --- Step 1: Trigger Flow ---
-  // Wait for chat input and send the initial query defined in .env
-  await expect(askField).toBeVisible({ timeout: 180_000 });
-  await askField.click({ timeout: 30_000 }).catch(() => {});
-  await askField.fill(query);
-  await askField.press('Enter').catch(() => {});
+  // Wait a little after Qube Mesh loads, then submit the initial query defined in .env
+  aiEventsCount = await enterPromptAndSubmit(page, query, aiEventsCount);
 
   // --- Step 2: Contract Identification & Verification ---
   // Verify the bot found the contract (Matches: "I have found the CDR..." or "I have found CDR...")
