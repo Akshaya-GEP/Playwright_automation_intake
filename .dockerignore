@@ -2,10 +2,13 @@ node_modules
 test-results
 playwright-report
 .auth
+automation/.auth
 .git
 .cache
 npm-debug.log
 yarn-error.log
 *.log
+.env
+.env.*
 
 

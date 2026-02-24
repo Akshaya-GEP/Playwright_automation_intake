@@ -9,6 +9,13 @@ npm install
 npx playwright install
 ```
 
+## Environment variables (local)
+
+- Copy `ENV.example` → `.env`
+- Fill in `BASE_URL`, `QUBE_MESH_URL`, `USER_ID`, `PASSWORD`
+- **Do not commit `.env`** (it must stay local only)
+- If `.env` was ever pushed to GitHub, **rotate credentials immediately** and consider purging it from git history.
+
 
 ## Run via dashboard 
 
@@ -75,6 +82,17 @@ npm run test:ui
 6. Deploy.
 
 After deploy, open the service URL to access the dashboard.
+
+## GitHub Actions (trigger runs from a URL)
+
+This repo includes a manual workflow: `.github/workflows/playwright-manual.yml`.
+
+1. In GitHub repo settings, add **Repository secrets** (Actions):
+   - `BASE_URL`, `QUBE_MESH_URL`, `USER_ID`, `PASSWORD`
+2. Trigger the run:
+   - Open GitHub → **Actions** → **Playwright (manual)** → **Run workflow**
+3. View the report:
+   - Open the workflow run → **Artifacts** → download `playwright-report` → open `index.html`
 
 ## Headed (visible browser) runs
 
