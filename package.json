@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "postinstall": "node -e \"if (process.platform === 'linux') { require('child_process').execSync('npx playwright install --with-deps chromium', { stdio: 'inherit' }); } else { console.log('postinstall: skipping Playwright browser install on', process.platform); }\"",
+    "postinstall": "node -e \"if (process.platform === 'linux') { require('child_process').execSync('PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium', { stdio: 'inherit' }); } else { console.log('postinstall: skipping Playwright browser install on', process.platform); }\"",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
