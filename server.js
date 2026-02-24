@@ -57,6 +57,19 @@ app.get('/', (_req, res) => {
 // Serve Playwright HTML report (static) at /report (like Playwright's default report folder)
 app.use('/report', express.static(path.join(__dirname, 'playwright-report')));
 
+// Serve Playwright raw artifacts (videos/screenshots/error-context) at /test-results.
+// NOTE: Protect your service with Basic Auth (DASHBOARD_USER/DASHBOARD_PASS) to avoid leaking artifacts.
+app.use(
+    '/test-results',
+    express.static(path.join(__dirname, 'test-results'), {
+        etag: false,
+        maxAge: 0,
+        setHeaders: (res) => {
+            res.setHeader('Cache-Control', 'no-store');
+        },
+    }),
+);
+
 // Render/cloud note: headed mode usually won't work (no display). Force headless when enabled.
 const FORCE_HEADLESS =
     ['1', 'true', 'yes'].includes(String(process.env.FORCE_HEADLESS || '').toLowerCase()) ||
@@ -69,6 +82,16 @@ app.get('/health', (_req, res) => {
         uptimeSec: Math.round(process.uptime()),
         forceHeadless: FORCE_HEADLESS,
         node: process.version,
+        // Render metadata (best-effort; values depend on Render environment)
+        render: {
+            serviceId: process.env.RENDER_SERVICE_ID || null,
+            instanceId: process.env.RENDER_INSTANCE_ID || null,
+            gitCommit:
+                process.env.RENDER_GIT_COMMIT ||
+                process.env.RENDER_COMMIT ||
+                process.env.GIT_COMMIT ||
+                null,
+        },
     });
 });
 
