@@ -969,6 +969,8 @@
         let currentStream = null; // EventSource
         let currentAbort = null; // AbortController for non-streaming fetch runs
         let runStartMs = null;
+        let runStatusPollTimer = null;
+        let lastKnownCommand = null;
 
         const els = {
             runAgentsCard: document.getElementById('runAgentsCard'),
@@ -992,7 +994,17 @@
             const dotClass = kind === 'ok' ? 'ok' : (kind === 'warn' ? 'warn' : (kind === 'bad' ? 'bad' : ''));
             els.statusDot.className = `dot ${dotClass}`;
             const dur = runStartMs ? ` · ${Math.round((Date.now() - runStartMs) / 1000)}s` : '';
-            els.statusText.innerHTML = `Status: <strong>${text}</strong>${dur}`;
+            const cmd = lastKnownCommand ? ` · <code>${escapeHtml(lastKnownCommand)}</code>` : '';
+            els.statusText.innerHTML = `Status: <strong>${text}</strong>${dur}${cmd}`;
+        }
+
+        function escapeHtml(s) {
+            return String(s || '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
         }
 
         function appendLog(line) {
@@ -1085,8 +1097,54 @@
                 currentStream.close();
                 currentStream = null;
             }
+            stopRunStatusPolling();
             setButtonsRunning(false);
             setStatus('warn', 'stopped');
+        }
+
+        function startRunStatusPolling() {
+            if (runStatusPollTimer) return;
+            runStatusPollTimer = setInterval(() => {
+                syncRunStatus().catch(() => { });
+            }, 5000);
+        }
+
+        function stopRunStatusPolling() {
+            if (!runStatusPollTimer) return;
+            clearInterval(runStatusPollTimer);
+            runStatusPollTimer = null;
+        }
+
+        async function syncRunStatus(reason) {
+            try {
+                const resp = await fetch(`${API_BASE}/run-status`, { method: 'GET', cache: 'no-store' });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok) return;
+
+                if (data && data.isRunning) {
+                    // Keep UI in "running" state if server is still running a process.
+                    setButtonsRunning(true);
+                    if (typeof data.runningForSec === 'number') {
+                        runStartMs = Date.now() - (data.runningForSec * 1000);
+                    } else if (!runStartMs) {
+                        runStartMs = Date.now();
+                    }
+                    lastKnownCommand = data.command || lastKnownCommand;
+                    setStatus('warn', reason ? `running (${reason})` : 'running');
+                    startRunStatusPolling();
+                } else {
+                    // Server is idle.
+                    stopRunStatusPolling();
+                    if (currentStream) {
+                        try { currentStream.close(); } catch { }
+                        currentStream = null;
+                    }
+                    setButtonsRunning(false);
+                    if (!reason) setStatus('', 'idle');
+                }
+            } catch {
+                // ignore
+            }
         }
 
         async function ensureServerUp() {
@@ -1107,6 +1165,7 @@
 
             setButtonsRunning(true);
             runStartMs = Date.now();
+            lastKnownCommand = null;
             setStatus('warn', 'running');
             clearLogs();
 
@@ -1126,6 +1185,7 @@
             es.addEventListener('start', (ev) => {
                 try {
                     const payload = JSON.parse(ev.data || '{}');
+                    lastKnownCommand = payload.command || lastKnownCommand;
                     appendLog(`Command: ${payload.command || '(unknown)'}`);
                 } catch { }
             });
@@ -1148,6 +1208,7 @@
                     code = payload.exitCode;
                 } catch { }
 
+                stopRunStatusPolling();
                 setButtonsRunning(false);
                 setStatus(success ? 'ok' : 'bad', success ? `done (exit ${code ?? 0})` : `failed (exit ${code ?? 1})`);
                 appendLog(`Run finished. exitCode=${code}`);
@@ -1159,6 +1220,17 @@
                 try {
                     const payload = JSON.parse(ev.data || '{}');
                     appendLog(payload?.message || 'Server error');
+
+                    // If the server reports an active run, keep UI synced by polling /run-status.
+                    if (payload && payload.isRunning) {
+                        lastKnownCommand = payload.command || lastKnownCommand;
+                        if (typeof payload.runningForSec === 'number') {
+                            runStartMs = Date.now() - (payload.runningForSec * 1000);
+                        }
+                        setButtonsRunning(true);
+                        setStatus('warn', 'already running');
+                        startRunStatusPolling();
+                    }
                 } catch {
                     appendLog(String(ev.data || 'Server error'));
                 }
@@ -1167,10 +1239,14 @@
             es.addEventListener('error', (ev) => {
                 // In SSE, 'error' may fire on reconnect attempt as well; treat as fatal if readyState is CLOSED.
                 if (es.readyState === EventSource.CLOSED) {
-                    setButtonsRunning(false);
-                    setStatus('bad', 'stream error');
-                    appendLog('Stream closed unexpectedly (SSE connection dropped).');
+                    appendLog('Stream closed unexpectedly (SSE connection dropped). Checking server status…');
                     currentStream = null;
+                    // On Render/Cloudflare the SSE connection can drop even while the run continues.
+                    // Poll server status to keep UI in sync and keep Stop enabled.
+                    syncRunStatus('stream disconnected').catch(() => {
+                        setButtonsRunning(false);
+                        setStatus('bad', 'stream error');
+                    });
                 }
             });
         }
@@ -1302,6 +1378,8 @@
         setSuiteMode('headed');
         setLiveLogsUi();
         els.liveLogsToggle?.addEventListener('change', setLiveLogsUi);
+        // On load, sync with backend in case a run is already in progress (or a previous stream dropped).
+        syncRunStatus().catch(() => { });
 
         // Close sidebar on ESC
         window.addEventListener('keydown', (e) => {

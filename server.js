@@ -113,6 +113,19 @@ let isRunning = false;
 let debugUiRunning = false;
 let currentChild = null; // exec()-based run (non-streaming)
 let currentStreamChild = null; // spawn()-based run (SSE streaming)
+let currentRunCommand = null;
+let currentRunStartedAtMs = null;
+
+function getRunStatus() {
+    if (!isRunning) return { isRunning: false };
+    const runningForMs = currentRunStartedAtMs ? Date.now() - currentRunStartedAtMs : null;
+    return {
+        isRunning: true,
+        command: currentRunCommand,
+        runningForSec: runningForMs !== null ? Math.round(runningForMs / 1000) : null,
+        pid: currentStreamChild?.pid || currentChild?.pid || null,
+    };
+}
 
 function writeSseHeaders(res) {
     res.writeHead(200, {
@@ -164,11 +177,14 @@ function runCommand(command, res) {
     if (isRunning) {
         return res.status(409).json({
             success: false,
-            error: 'A test run is already in progress. Please wait until it finishes.'
+            error: 'A test run is already in progress. Please wait until it finishes.',
+            ...getRunStatus(),
         });
     }
 
     isRunning = true;
+    currentRunCommand = command;
+    currentRunStartedAtMs = Date.now();
     console.log(`Executing: ${command}`);
 
     const child = exec(
@@ -200,6 +216,8 @@ function runCommand(command, res) {
             } finally {
                 isRunning = false;
                 currentChild = null;
+                currentRunCommand = null;
+                currentRunStartedAtMs = null;
             }
         }
     );
@@ -261,12 +279,17 @@ function streamCommand(command, res) {
     writeSseHeaders(res);
 
     if (isRunning) {
-        sseSend(res, 'server_error', { message: 'A test run is already in progress. Please wait until it finishes.' });
+        sseSend(res, 'server_error', {
+            message: 'A test run is already in progress. Please wait until it finishes.',
+            ...getRunStatus(),
+        });
         sseSend(res, 'done', { exitCode: null, success: false });
         return res.end();
     }
 
     isRunning = true;
+    currentRunCommand = command;
+    currentRunStartedAtMs = Date.now();
 
     // Keep-alive pings so proxies (Render, etc.) don't close idle SSE connections.
     const pingTimer = setInterval(() => {
@@ -281,7 +304,9 @@ function streamCommand(command, res) {
     send('start', { command });
     console.log(`[stream] Executing: ${command}`);
 
-    const child = spawn(command, { cwd: process.cwd(), shell: true, detached: !isWindows, stdio: ['ignore', 'pipe', 'pipe'] });
+    // IMPORTANT: Do NOT detach on Linux for SSE runs. Render/proxies may drop the SSE connection;
+    // detaching can orphan the process and make stop/cleanup unreliable.
+    const child = spawn(command, { cwd: process.cwd(), shell: true, detached: false, stdio: ['ignore', 'pipe', 'pipe'] });
     currentStreamChild = child;
 
     child.stdout.on('data', (chunk) => {
@@ -301,6 +326,8 @@ function streamCommand(command, res) {
     child.on('exit', (code) => {
         isRunning = false;
         currentStreamChild = null;
+        currentRunCommand = null;
+        currentRunStartedAtMs = null;
         clearInterval(pingTimer);
         send('done', { exitCode: code, success: code === 0 });
         res.end();
@@ -309,6 +336,8 @@ function streamCommand(command, res) {
     child.on('error', (err) => {
         isRunning = false;
         currentStreamChild = null;
+        currentRunCommand = null;
+        currentRunStartedAtMs = null;
         clearInterval(pingTimer);
         send('server_error', { message: err.message });
         send('done', { exitCode: null, success: false });
@@ -318,9 +347,9 @@ function streamCommand(command, res) {
     // Clean up if client disconnects
     res.on('close', () => {
         clearInterval(pingTimer);
-        if (!child.killed) child.kill();
-        isRunning = false;
-        currentStreamChild = null;
+        // Keep the test running even if the SSE client disconnects (common on Render/proxies/page reloads).
+        // The run can still be observed via server logs, and stopped via /stop-run.
+        console.log('[stream] SSE client disconnected; leaving test process running.');
     });
 }
 
@@ -337,12 +366,19 @@ app.post('/stop-run', async (_req, res) => {
     isRunning = false;
     currentChild = null;
     currentStreamChild = null;
+    currentRunCommand = null;
+    currentRunStartedAtMs = null;
 
     if (!killed) {
         return res.status(500).json({ success: false, error: 'Failed to stop the running process (best-effort).' });
     }
 
     return res.json({ success: true });
+});
+
+// Run status endpoint (helps when the dashboard says "already running")
+app.get('/run-status', (_req, res) => {
+    res.json(getRunStatus());
 });
 
 // SSE stream — Run ALL tests headed
