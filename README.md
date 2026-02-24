@@ -83,6 +83,47 @@ npm run test:ui
 
 After deploy, open the service URL to access the dashboard.
 
+## Deploy on Fly.io (Docker) — recommended for SSE stability
+
+### Prereqs
+
+- Install `flyctl` (Fly.io CLI) and login.
+
+### Steps
+
+1. Create the Fly app (from repo root):
+
+```bash
+fly launch --no-deploy
+```
+
+2. Set secrets (required):
+
+```bash
+fly secrets set BASE_URL="..." QUBE_MESH_URL="..." USER_ID="..." PASSWORD="..."
+```
+
+3. Protect the dashboard (recommended):
+
+```bash
+fly secrets set DASHBOARD_USER="admin" DASHBOARD_PASS="change-me"
+```
+
+4. Deploy:
+
+```bash
+fly deploy
+```
+
+5. Open:
+
+- Dashboard: `https://<your-app>.fly.dev/`
+- Report: `https://<your-app>.fly.dev/report/index.html`
+
+Notes:
+- Keep **1 instance** (so the report you generate is served from the same machine): `fly scale count 1`
+- Cloud runs are **headless** (the repo defaults `FORCE_HEADLESS=true` in `fly.toml`).
+
 ## GitHub Actions (trigger runs from a URL)
 
 This repo includes a manual workflow: `.github/workflows/playwright-manual.yml`.

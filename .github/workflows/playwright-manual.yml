@@ -47,6 +47,7 @@ jobs:
         run: npm ci
 
       - name: Validate required secrets
+        shell: bash
         run: |
           missing=0
           for k in BASE_URL QUBE_MESH_URL USER_ID PASSWORD; do
