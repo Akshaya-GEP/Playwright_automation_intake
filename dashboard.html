@@ -844,9 +844,8 @@
                                 <option value="" disabled selected>Select an Agent</option>
                                 <optgroup label="Supplier Offboarding Assistant">
                                     <option value="1">1 — Supplier Offboarding (Microsoft)</option>
-                                    <option value="1.1">1.1 — Supplier Offboarding (Adobe)</option>
-                                    <option value="1.2">1.2 — Supplier Offboarding (Workday)</option>
-                                    <option value="1.3">1.3 — Supplier Offboarding (By supplier code)</option>
+                          
+                                    <option value="1.2">1.1 — Supplier Offboarding (Workday)</option>
                                 </optgroup>
                                 <optgroup label="Contract Amendment Assistant">
                                     <option value="2">2 — Contract Amendment</option>
@@ -1156,12 +1155,21 @@
                 currentStream = null;
             });
 
+            es.addEventListener('server_error', (ev) => {
+                try {
+                    const payload = JSON.parse(ev.data || '{}');
+                    appendLog(payload?.message || 'Server error');
+                } catch {
+                    appendLog(String(ev.data || 'Server error'));
+                }
+            });
+
             es.addEventListener('error', (ev) => {
                 // In SSE, 'error' may fire on reconnect attempt as well; treat as fatal if readyState is CLOSED.
                 if (es.readyState === EventSource.CLOSED) {
                     setButtonsRunning(false);
                     setStatus('bad', 'stream error');
-                    appendLog('Stream closed unexpectedly.');
+                    appendLog('Stream closed unexpectedly (SSE connection dropped).');
                     currentStream = null;
                 }
             });
