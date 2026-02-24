@@ -28,24 +28,108 @@ app.get('/', (_req, res) => {
 // Serve Playwright HTML report (static) at /report (like Playwright's default report folder)
 app.use('/report', express.static(path.join(__dirname, 'playwright-report')));
 
+// Render/cloud note: headed mode usually won't work (no display). Force headless when enabled.
+const FORCE_HEADLESS =
+    ['1', 'true', 'yes'].includes(String(process.env.FORCE_HEADLESS || '').toLowerCase()) ||
+    !!process.env.RENDER;
+
+// Simple endpoints for Render debugging (verify deployment is running this server)
+app.get('/health', (_req, res) => {
+    res.json({
+        ok: true,
+        uptimeSec: Math.round(process.uptime()),
+        forceHeadless: FORCE_HEADLESS,
+        node: process.version,
+    });
+});
+
+app.get('/routes', (_req, res) => {
+    res.json({
+        sse: ['/stream-run-agent', '/stream-run-headed', '/stream-run-headless'],
+        post: ['/run-test', '/run-all-tests-headed', '/run-all-tests', '/run-all-playwright', '/run-all', '/stop-run', '/debug-ui'],
+        agents: Object.keys(AGENT_SPECS).sort(),
+    });
+});
+
+function pwCommand({ headed, specOrDir }) {
+    const safeTarget = specOrDir ? ` ${specOrDir}` : '';
+    return headed
+        ? `npm run test:headed -- --project=chromium${safeTarget}`
+        : `npm test -- --project=chromium${safeTarget}`;
+}
+
 // Mapping of Agent IDs to your Playwright Commands
-const AGENT_COMMANDS = {
-    '1': 'npm run test:headed -- --project=chromium automation/tests/agent1.spec.ts',
-    '1.1': 'npm run test:headed -- --project=chromium automation/tests/agent1.1.spec.ts',
-    '1.2': 'npm run test:headed -- --project=chromium automation/tests/agent1.2.spec.ts',
-    '1.3': 'npm run test:headed -- --project=chromium automation/tests/agent1.3.spec.ts',
-    '2': 'npm run test:headed -- --project=chromium automation/tests/agent2.spec.ts',
-    '2.1': 'npm run test:headed -- --project=chromium automation/tests/agent2.1.spec.ts',
-    '3.1': 'npm run test:headed -- --project=chromium automation/tests/agent3.spec.ts',
-    '3': 'npm run test:headed -- --project=chromium automation/tests/agent3_1.spec.ts',
-    '4': 'npm run test:headed -- --project=chromium automation/tests/agent4.spec.ts',
-    '4.1': 'npm run test:headed -- --project=chromium automation/tests/agent4.1.spec.ts',
-    '5': 'npm run test:headed -- --project=chromium automation/tests/agent5.spec.ts',
-    '5.1': 'npm run test:headed -- --project=chromium automation/tests/agent5.1.spec.ts',
+const AGENT_SPECS = {
+    '1': 'automation/tests/agent1.spec.ts',
+    '1.2': 'automation/tests/agent1.2.spec.ts',
+    '2': 'automation/tests/agent2.spec.ts',
+    '2.1': 'automation/tests/agent2.1.spec.ts',
+    // Agent 3 = future-date termination, Agent 3.1 = terminate immediately
+    '3': 'automation/tests/agent3.spec.ts',
+    '3.1': 'automation/tests/agent3_1.spec.ts',
+    '4': 'automation/tests/agent4.spec.ts',
+    '4.1': 'automation/tests/agent4.1.spec.ts',
+    '5': 'automation/tests/agent5.spec.ts',
+    '5.1': 'automation/tests/agent5_1.spec.ts',
 };
+
+const AGENT_COMMANDS = Object.fromEntries(
+    Object.entries(AGENT_SPECS).map(([id, spec]) => [
+        id,
+        pwCommand({ headed: !FORCE_HEADLESS, specOrDir: spec }),
+    ]),
+);
 
 let isRunning = false;
 let debugUiRunning = false;
+let currentChild = null; // exec()-based run (non-streaming)
+let currentStreamChild = null; // spawn()-based run (SSE streaming)
+
+function writeSseHeaders(res) {
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+    });
+    if (typeof res.flushHeaders === 'function') res.flushHeaders();
+}
+
+function sseSend(res, event, data) {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
+function killProcessTree(pid) {
+    if (!pid) return Promise.resolve(false);
+
+    return new Promise((resolve) => {
+        try {
+            if (isWindows) {
+                // /T = kill child processes, /F = force
+                const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { shell: true, windowsHide: true });
+                killer.on('exit', (code) => resolve(code === 0));
+                killer.on('error', () => resolve(false));
+                return;
+            }
+
+            // Best effort on POSIX
+            try {
+                // If process was spawned as its own process group (detached), this kills the whole group
+                process.kill(-pid, 'SIGTERM');
+                return resolve(true);
+            } catch { }
+
+            try {
+                process.kill(pid, 'SIGTERM');
+                return resolve(true);
+            } catch { }
+
+            return resolve(false);
+        } catch {
+            return resolve(false);
+        }
+    });
+}
 
 function runCommand(command, res) {
     if (isRunning) {
@@ -58,12 +142,13 @@ function runCommand(command, res) {
     isRunning = true;
     console.log(`Executing: ${command}`);
 
-    exec(
+    const child = exec(
         command,
         {
             cwd: process.cwd(),
             maxBuffer: 50 * 1024 * 1024, // 50MB buffer for large outputs
-            shell: shell
+            shell: shell,
+            detached: !isWindows,
         },
         (error, stdout, stderr) => {
             try {
@@ -85,9 +170,12 @@ function runCommand(command, res) {
                 });
             } finally {
                 isRunning = false;
+                currentChild = null;
             }
         }
     );
+
+    currentChild = child;
 }
 
 // API Endpoint to trigger the test
@@ -105,16 +193,150 @@ app.post('/run-test', (req, res) => {
 
 // Run ALL tests in headed mode (chromium project)
 app.post('/run-all-tests-headed', (_req, res) => {
-    const command = 'npm run test:headed -- --project=chromium';
-    console.log('Received request to run ALL tests (headed).');
+    // Run all Playwright specs under automation/tests (headed, chromium).
+    // (Project dependency "setup" will still run automatically.)
+    const command = pwCommand({ headed: !FORCE_HEADLESS, specOrDir: 'automation/tests' });
+    console.log(`Received request to run ALL Playwright tests (${FORCE_HEADLESS ? 'headless (forced)' : 'headed'}).`);
     return runCommand(command, res);
 });
 
 // Back-compat alias: /run-all-tests (headed)
 app.post('/run-all-tests', (_req, res) => {
-    const command = 'npm run test:headed -- --project=chromium';
-    console.log('Received request to run ALL tests (headed) via /run-all-tests.');
+    const command = pwCommand({ headed: !FORCE_HEADLESS, specOrDir: 'automation/tests' });
+    console.log(`Received request to run ALL Playwright tests (${FORCE_HEADLESS ? 'headless (forced)' : 'headed'}) via /run-all-tests.`);
     return runCommand(command, res);
+});
+
+// Run ALL Playwright tests (headless) for chromium project
+app.post('/run-all-playwright', (_req, res) => {
+    const command = pwCommand({ headed: false, specOrDir: 'automation/tests' });
+    console.log('Received request to run ALL Playwright tests (headless).');
+    return runCommand(command, res);
+});
+
+// Run ALL tests: Playwright (chromium) + BDD (Cucumber) sequentially
+app.post('/run-all', (_req, res) => {
+    // Works on both cmd.exe and bash: "&&" runs the second command only if the first succeeds.
+    const command = 'npm test -- --project=chromium automation/tests && npm run bdd';
+    console.log('Received request to run ALL tests (Playwright + BDD).');
+    return runCommand(command, res);
+});
+
+/**
+ * SSE streaming helper — spawns a shell command and sends each stdout/stderr
+ * line as an SSE event so the browser can display live progress.
+ */
+function streamCommand(command, res) {
+    // IMPORTANT: EventSource treats non-200 responses as a network error and closes without exposing the body.
+    // So even "error" cases should return 200 and send an SSE error event.
+    writeSseHeaders(res);
+
+    if (isRunning) {
+        sseSend(res, 'server_error', { message: 'A test run is already in progress. Please wait until it finishes.' });
+        sseSend(res, 'done', { exitCode: null, success: false });
+        return res.end();
+    }
+
+    isRunning = true;
+
+    // Keep-alive pings so proxies (Render, etc.) don't close idle SSE connections.
+    const pingTimer = setInterval(() => {
+        try {
+            // SSE comment line (doesn't trigger an event)
+            res.write(`: ping ${Date.now()}\n\n`);
+        } catch { }
+    }, 15_000);
+
+    const send = (event, data) => sseSend(res, event, data);
+
+    send('start', { command });
+    console.log(`[stream] Executing: ${command}`);
+
+    const child = spawn(command, { cwd: process.cwd(), shell: true, detached: !isWindows, stdio: ['ignore', 'pipe', 'pipe'] });
+    currentStreamChild = child;
+
+    child.stdout.on('data', (chunk) => {
+        const lines = chunk.toString().split(/\r?\n/);
+        for (const line of lines) {
+            if (line.trim()) send('line', { text: line });
+        }
+    });
+
+    child.stderr.on('data', (chunk) => {
+        const lines = chunk.toString().split(/\r?\n/);
+        for (const line of lines) {
+            if (line.trim()) send('line', { text: line });
+        }
+    });
+
+    child.on('exit', (code) => {
+        isRunning = false;
+        currentStreamChild = null;
+        clearInterval(pingTimer);
+        send('done', { exitCode: code, success: code === 0 });
+        res.end();
+    });
+
+    child.on('error', (err) => {
+        isRunning = false;
+        currentStreamChild = null;
+        clearInterval(pingTimer);
+        send('server_error', { message: err.message });
+        send('done', { exitCode: null, success: false });
+        res.end();
+    });
+
+    // Clean up if client disconnects
+    res.on('close', () => {
+        clearInterval(pingTimer);
+        if (!child.killed) child.kill();
+        isRunning = false;
+        currentStreamChild = null;
+    });
+}
+
+// Stop the currently running command (best-effort)
+app.post('/stop-run', async (_req, res) => {
+    if (!isRunning) {
+        return res.status(409).json({ success: false, error: 'No run is currently in progress.' });
+    }
+
+    const pid = currentStreamChild?.pid || currentChild?.pid;
+    const killed = await killProcessTree(pid);
+
+    // Even if kill fails, mark as not running to unblock the UI (process may already be exiting)
+    isRunning = false;
+    currentChild = null;
+    currentStreamChild = null;
+
+    if (!killed) {
+        return res.status(500).json({ success: false, error: 'Failed to stop the running process (best-effort).' });
+    }
+
+    return res.json({ success: true });
+});
+
+// SSE stream — Run ALL tests headed
+app.get('/stream-run-headed', (_req, res) => {
+    streamCommand(pwCommand({ headed: !FORCE_HEADLESS, specOrDir: 'automation/tests' }), res);
+});
+
+// SSE stream — Run ALL tests headless
+app.get('/stream-run-headless', (_req, res) => {
+    streamCommand(pwCommand({ headed: false, specOrDir: 'automation/tests' }), res);
+});
+
+// SSE stream — Run a single agent test
+app.get('/stream-run-agent', (req, res) => {
+    const agentId = req.query.agentId;
+    const command = AGENT_COMMANDS[agentId];
+    if (!command) {
+        writeSseHeaders(res);
+        sseSend(res, 'server_error', { message: 'Invalid Agent ID' });
+        sseSend(res, 'done', { exitCode: null, success: false });
+        return res.end();
+    }
+    streamCommand(command, res);
 });
 
 // Start Playwright UI mode in the background (optional debug helper)
@@ -163,14 +385,14 @@ app.get('/report-status', (_req, res) => {
 const server = app.listen(PORT, () => {
     console.log(`🚀 Automation Runner Server running at http://localhost:${PORT}`);
     console.log(`🧭 Dashboard: http://localhost:${PORT}/`);
-   
+
 });
 
 // Ensure the process stays alive in terminals/environments where stdin may be closed unexpectedly.
 // (Express listen normally keeps Node alive, but this makes startup more resilient on Windows shells.)
 try {
     process.stdin.resume();
-} catch {}
+} catch { }
 
 server.on('error', (err) => {
     // Common when server is already running in another terminal
