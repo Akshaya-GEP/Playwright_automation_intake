@@ -51,6 +51,8 @@ app.use((req, res, next) => {
 
 // Serve the dashboard UI
 app.get('/', (_req, res) => {
+    // Avoid stale dashboard JS on CDN/proxies; the dashboard contains reconnection logic.
+    res.setHeader('Cache-Control', 'no-store');
     res.sendFile(path.join(__dirname, 'dashboard.html'));
 });
 
