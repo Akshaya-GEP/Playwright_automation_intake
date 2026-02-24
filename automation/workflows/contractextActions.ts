@@ -17,7 +17,7 @@ export async function handleExtensionDateSelection(page: Page, dateStr: string) 
         .filter({ has: page.locator('label').filter({ hasText: labelRe }) })
         .first();
 
-    await expect(datePickerWidget).toBeVisible({ timeout: 60_000 });
+    await expect(datePickerWidget).toBeVisible({ timeout: 180_000 });
 
     const dateElement = datePickerWidget.locator('.span-date-element').first();
     const inputContainer = datePickerWidget.locator('.input-container').first();

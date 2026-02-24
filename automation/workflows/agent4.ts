@@ -2,7 +2,14 @@ import { expect, type Page } from '@playwright/test';
 import type { AgentContext } from './types';
 import { waitForAiEvents } from './aiEvents';
 import { finalizeRequestFlow } from './utils';
-import { enterPromptAndSubmit, clickYesForQuestion, clickProceedIfPresent } from './uiActions';
+import {
+  clickCreateRequest,
+  clickProceedWithRequest,
+  enterPromptAndSubmit,
+  clickYesForQuestion,
+  clickProceedIfPresent,
+  getCreateRequestControl,
+} from './uiActions';
 import {
   handleExtensionDateSelection,
   clickExtensionReason,
@@ -29,17 +36,17 @@ export async function workflowAgent4(page: Page, _ctx: AgentContext, data: Contr
   await expect(page.getByText(/Contract Number:/i).filter({ hasNot: page.locator('code') }).first()).toBeVisible();
   await expect(page.getByText(/Expiry Date:/i).filter({ hasNot: page.locator('code') }).first()).toBeVisible();
 
-  const proceedWithRequestBtn = page.getByRole('button', { name: /proceed with request/i }).first();
-  await expect(proceedWithRequestBtn).toBeVisible({ timeout: 60_000 });
-  await proceedWithRequestBtn.click();
-  aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
+  aiEventsCount = await clickProceedWithRequest(page, aiEventsCount);
 
   // Step 3: Date Selection (from CSV)
-  const datePrompt = page
-    .getByText(/capture the contract extension date/i)
+  // Some builds don't show the literal prompt text; don't hard-block on copy.
+  // `handleExtensionDateSelection` will wait for the actual "Extension Date" widget instead.
+  page
+    .getByText(/capture the contract extension date|extension date/i)
     .filter({ hasNot: page.locator('code') })
-    .first();
-  await expect(datePrompt).toBeVisible({ timeout: 180_000 });
+    .first()
+    .waitFor({ state: 'visible', timeout: 15_000 })
+    .catch(() => {});
 
   await handleExtensionDateSelection(page, data.extensionDate);
   aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
@@ -62,10 +69,46 @@ export async function workflowAgent4(page: Page, _ctx: AgentContext, data: Contr
   aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
 
   // Step 6: Supplier Discussion (+ conditional follow-ups)
-  const discussionPrompt = page.getByText(/discussed with the supplier/i).filter({ hasNot: page.locator('code') }).first();
-  await expect(discussionPrompt).toBeVisible({ timeout: 180_000 });
+  const discussionQuestion = page
+    .getByText(/have the proposed change\(s\) been discussed with the supplier|discussed with the supplier/i)
+    .filter({ hasNot: page.locator('code') })
+    .first();
+  await expect(discussionQuestion).toBeVisible({ timeout: 180_000 });
 
-  aiEventsCount = await enterPromptAndSubmit(page, 'yes, i have discussed', aiEventsCount);
+  // Some builds render Yes/No buttons + a follow-up summary prompt; others accept a single text response.
+  // Handle both:
+  // - If Yes is clickable near the question, click it
+  // - If a summary prompt appears, answer it
+  // - Otherwise, send a combined answer in one shot
+  const discussionSummary =
+    (data.modificationDetails || '').trim() ||
+    'Discussed the proposed changes with the supplier and aligned on the extension date and terms.';
+  const combinedAnswer = `Yes, I have discussed. Summary: ${discussionSummary}`;
+
+  const summaryPrompt = page
+    .getByText(/provide a summary of the discussion|summary of the discussion/i)
+    .filter({ hasNot: page.locator('code') })
+    .first();
+
+  let clickedYes = false;
+  try {
+    await clickYesForQuestion(page, discussionQuestion);
+    clickedYes = true;
+    aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);
+  } catch {
+    // No Yes/No UI found (or not clickable): fall back to sending combined answer.
+  }
+
+  const needsSummary = await summaryPrompt
+    .waitFor({ state: 'visible', timeout: 30_000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (needsSummary) {
+    aiEventsCount = await enterPromptAndSubmit(page, combinedAnswer, aiEventsCount);
+  } else if (!clickedYes) {
+    aiEventsCount = await enterPromptAndSubmit(page, combinedAnswer, aiEventsCount);
+  }
 
   const questions = [
     page
@@ -87,7 +130,24 @@ export async function workflowAgent4(page: Page, _ctx: AgentContext, data: Contr
     }
   }
 
-  // Step 7+: Finalize (includes "Create Request" + send for validation when applicable)
+  // Step 7: Create Request (some UIs skip directly to final CTAs; don't hard-block)
+  const createRequest = getCreateRequestControl(page);
+  const sendForValidation = page.getByRole('button', { name: /send (for )?validation/i }).first();
+  const editProjectRequest = page.getByRole('button', { name: /edit project request/i }).first();
+  const congratulations = page.getByText(/congratulations|congrats/i).first();
+
+  const next = await Promise.race([
+    createRequest.waitFor({ state: 'visible', timeout: 240_000 }).then(() => 'create'),
+    sendForValidation.waitFor({ state: 'visible', timeout: 240_000 }).then(() => 'send'),
+    editProjectRequest.waitFor({ state: 'visible', timeout: 240_000 }).then(() => 'edit'),
+    congratulations.waitFor({ state: 'visible', timeout: 240_000 }).then(() => 'congrats'),
+  ]).catch(() => null);
+
+  if (next === 'create') {
+    aiEventsCount = await clickCreateRequest(page, aiEventsCount);
+  }
+
+  // Step 8: Finalize (Send for validation when applicable) + Congrats/end screen
   return await finalizeRequestFlow(page, { endTimeoutMs: 360_000 });
 }
 

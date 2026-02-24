@@ -56,7 +56,7 @@ npm run test:ui
 
 ## Deploy on Render
 
-This repo includes a `Dockerfile` that bundles Playwright browsers, which is the easiest way to deploy on Render.
+**Recommended**: deploy using Docker (headless). This avoids Linux dependency issues when installing Playwright on PaaS hosts.
 
 - **Service type**: Web Service
 - **Runtime**: Docker
@@ -68,8 +68,16 @@ This repo includes a `Dockerfile` that bundles Playwright browsers, which is the
 1. Push your code to GitHub.
 2. In Render: **New +** → **Web Service** → connect your repo.
 3. Choose **Docker**.
-4. (Recommended) Add env var:
-   - `FORCE_HEADLESS=true` (headed mode usually won’t work on servers without a display)
-5. Deploy.
+4. Add required env vars (see `ENV.md` / your internal doc):
+   - `BASE_URL`, `QUBE_MESH_URL`, `USER_ID`, `PASSWORD`
+5. (Recommended) Add access gate (internal sharing):
+   - `DASHBOARD_USER`, `DASHBOARD_PASS` (enables Basic Auth)
+6. Deploy.
 
 After deploy, open the service URL to access the dashboard.
+
+## Headed (visible browser) runs
+
+Cloud PaaS hosts (Render/Railway/Fly.io) generally do **not** provide a GUI display, so Playwright can only run **headless** there.
+
+If you need **headed** runs, use a **Windows VM** (Azure/AWS/GCP) and connect via RDP.

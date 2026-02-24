@@ -1,0 +1,11 @@
+node_modules
+test-results
+playwright-report
+.auth
+.git
+.cache
+npm-debug.log
+yarn-error.log
+*.log
+
+

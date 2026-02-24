@@ -20,6 +20,35 @@ const shell = isWindows ? 'cmd.exe' : '/bin/bash';
 app.use(cors());
 app.use(express.json());
 
+// Optional Basic Auth (recommended even for internal sharing).
+// Enable by setting BOTH env vars: DASHBOARD_USER and DASHBOARD_PASS.
+const DASHBOARD_USER = (process.env.DASHBOARD_USER || '').trim();
+const DASHBOARD_PASS = (process.env.DASHBOARD_PASS || '').trim();
+
+function parseBasicAuth(header) {
+    if (!header) return null;
+    const m = /^Basic\s+(.+)$/i.exec(header);
+    if (!m) return null;
+    try {
+        const decoded = Buffer.from(m[1], 'base64').toString('utf8');
+        const idx = decoded.indexOf(':');
+        if (idx < 0) return null;
+        return { user: decoded.slice(0, idx), pass: decoded.slice(idx + 1) };
+    } catch {
+        return null;
+    }
+}
+
+app.use((req, res, next) => {
+    if (!DASHBOARD_USER || !DASHBOARD_PASS) return next(); // auth disabled
+
+    const creds = parseBasicAuth(req.headers.authorization);
+    if (creds && creds.user === DASHBOARD_USER && creds.pass === DASHBOARD_PASS) return next();
+
+    res.setHeader('WWW-Authenticate', 'Basic realm="Automation Runner"');
+    return res.status(401).send('Unauthorized');
+});
+
 // Serve the dashboard UI
 app.get('/', (_req, res) => {
     res.sendFile(path.join(__dirname, 'dashboard.html'));
