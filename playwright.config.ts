@@ -1,32 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 import dotenv from 'dotenv';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { STORAGE_STATE, ensureStorageStateFileExists } from './automation/config/storageState';
 
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const baseURL = process.env.BASE_URL;
 const browserChannel = process.env.PW_BROWSER_CHANNEL || undefined;
 
-// Path to the authenticated storage state
-// Keep it inside `automation/` so it stays grouped with automation artifacts.
-const authDir = path.join(__dirname, 'automation', '.auth');
-export const STORAGE_STATE = path.join(authDir, 'user.json');
-
-// Ensure .auth directory and empty state file exist at config load time
-// This prevents the "file not found" error before setup runs
-try {
-  fs.mkdirSync(authDir, { recursive: true });
-  if (!fs.existsSync(STORAGE_STATE)) {
-    fs.writeFileSync(STORAGE_STATE, JSON.stringify({ cookies: [], origins: [] }), 'utf-8');
-  }
-} catch (e) {
-  // Ignore errors - setup will create the file
-}
+// Ensure `.auth` dir/state exists at config load time.
+ensureStorageStateFileExists();
 
 export default defineConfig({
   testDir: './automation',

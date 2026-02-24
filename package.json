@@ -4,15 +4,20 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "start": "node server.js",
+    "postinstall": "node -e \"if (process.platform === 'linux') { require('child_process').execSync('npx playwright install --with-deps chromium', { stdio: 'inherit' }); } else { console.log('postinstall: skipping Playwright browser install on', process.platform); }\"",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
-    "report": "playwright show-report"
+    "report": "playwright show-report",
+    "bdd": "node --experimental-specifier-resolution=node --loader ts-node/esm ./node_modules/@cucumber/cucumber/bin/cucumber.js automation/bdd/features --import automation/bdd/support/hooks.ts --import automation/bdd/step-definitions/*.steps.ts"
   },
   "devDependencies": {
+    "@cucumber/cucumber": "^11.3.0",
     "@playwright/test": "^1.50.1",
     "@types/node": "^22.10.7",
     "dotenv": "^16.4.7",
+    "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
   },
   "dependencies": {

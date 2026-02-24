@@ -198,28 +198,92 @@ async function isMaterialDatepickerOpen(page: Page): Promise<boolean> {
 
 async function selectDateInMaterialCalendar(page: Page, year: number, month: string, day: number): Promise<void> {
     const overlay = page.locator('.cdk-overlay-container');
-    const periodButton = overlay.locator('.mat-calendar-period-button').first();
-    await periodButton.click();
-    await page.waitForTimeout(500);
+    const pane = overlay.locator('.cdk-overlay-pane:visible').last();
+    const root = pane.or(overlay);
 
-    // Year
-    const yearCell = overlay.locator('.mat-calendar-body-cell').filter({ hasText: new RegExp(`^${year}$`) }).first();
-    if (await yearCell.isVisible().catch(() => false)) {
-        await yearCell.click();
-    } else {
-        await overlay.locator('.mat-calendar-previous-button').click();
-        await yearCell.click();
+    const periodButton = root.locator('.mat-calendar-period-button').first();
+    await expect(periodButton).toBeVisible({ timeout: 10_000 });
+
+    // Switch to year / multi-year view. Some builds need two clicks.
+    await periodButton.click({ timeout: 10_000 }).catch(() => { });
+    await page.waitForTimeout(300);
+
+    const anyCell = root.locator('.mat-calendar-body-cell').first();
+    const firstCellText = (await anyCell.textContent().catch(() => '') || '').trim();
+    if (!/^\d{4}$/.test(firstCellText)) {
+        await periodButton.click({ timeout: 10_000 }).catch(() => { });
+        await page.waitForTimeout(300);
     }
-    await page.waitForTimeout(500);
 
-    // Month
-    const monthCell = overlay.locator('.mat-calendar-body-cell').filter({ hasText: new RegExp(`^${month}$`, 'i') }).first();
-    await monthCell.click();
-    await page.waitForTimeout(500);
+    // Navigate to the target year (handles ranges like "2020 – 2043")
+    const maxAttempts = 40;
+    for (let i = 0; i < maxAttempts; i++) {
+        const yearCell = root.locator('.mat-calendar-body-cell').filter({ hasText: new RegExp(`^${year}$`) }).first();
+        if (await yearCell.isVisible().catch(() => false)) {
+            await yearCell.click({ timeout: 10_000 }).catch(() => yearCell.click({ timeout: 10_000, force: true }));
+            break;
+        }
+
+        const headerText = (await periodButton.textContent().catch(() => '') || '').trim();
+        const range = headerText.match(/(\d{4})\s*[–-]\s*(\d{4})/);
+        const single = headerText.match(/(\d{4})/);
+
+        const prevBtn = root.locator('.mat-calendar-previous-button').first();
+        const nextBtn = root.locator('.mat-calendar-next-button').first();
+
+        if (range) {
+            const start = parseInt(range[1], 10);
+            const end = parseInt(range[2], 10);
+            if (year < start) await prevBtn.click().catch(() => { });
+            else if (year > end) await nextBtn.click().catch(() => { });
+            else await prevBtn.click().catch(() => { }); // nudge if in-range but not visible
+        } else if (single) {
+            const shown = parseInt(single[1], 10);
+            if (year < shown) await prevBtn.click().catch(() => { });
+            else if (year > shown) await nextBtn.click().catch(() => { });
+            else await nextBtn.click().catch(() => { });
+        } else {
+            await nextBtn.click().catch(() => { });
+        }
+
+        await page.waitForTimeout(200);
+    }
+
+    await page.waitForTimeout(300);
+
+    // Month (grid uses abbreviations like JAN/FEB)
+    const monthFull = ({
+        JAN: 'January',
+        FEB: 'February',
+        MAR: 'March',
+        APR: 'April',
+        MAY: 'May',
+        JUN: 'June',
+        JUL: 'July',
+        AUG: 'August',
+        SEP: 'September',
+        OCT: 'October',
+        NOV: 'November',
+        DEC: 'December',
+    })[month.toUpperCase()] || month;
+
+    const monthCellAbbrev = root.locator('.mat-calendar-body-cell').filter({ hasText: new RegExp(`^${escapeRegex(month)}$`, 'i') }).first();
+    const monthCellFull = root.locator('.mat-calendar-body-cell').filter({ hasText: new RegExp(`^${escapeRegex(monthFull)}$`, 'i') }).first();
+
+    if (await monthCellAbbrev.isVisible().catch(() => false)) {
+        await monthCellAbbrev.click({ timeout: 10_000 }).catch(() => monthCellAbbrev.click({ timeout: 10_000, force: true }));
+    } else {
+        await monthCellFull.click({ timeout: 10_000 }).catch(() => monthCellFull.click({ timeout: 10_000, force: true }));
+    }
+    await page.waitForTimeout(300);
 
     // Day
-    const dayCell = overlay.locator('.mat-calendar-body-cell:not(.mat-calendar-body-disabled)').filter({ hasText: new RegExp(`^${day}$`) }).first();
-    await dayCell.click();
+    const dayCell = root
+        .locator('.mat-calendar-body-cell:not(.mat-calendar-body-disabled)')
+        .filter({ hasText: new RegExp(`^${day}$`) })
+        .first();
+    await expect(dayCell).toBeVisible({ timeout: 10_000 });
+    await dayCell.click({ timeout: 10_000 }).catch(() => dayCell.click({ timeout: 10_000, force: true }));
 }
 
 async function assertExtensionDateSet(widget: Locator, dateToSet: string): Promise<void> {
