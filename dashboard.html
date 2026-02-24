@@ -971,6 +971,8 @@
         let runStartMs = null;
         let runStatusPollTimer = null;
         let lastKnownCommand = null;
+        let lastStreamUrl = null;
+        let reconnectAttempt = 0;
 
         const els = {
             runAgentsCard: document.getElementById('runAgentsCard'),
@@ -1132,6 +1134,7 @@
                     lastKnownCommand = data.command || lastKnownCommand;
                     setStatus('warn', reason ? `running (${reason})` : 'running');
                     startRunStatusPolling();
+                    return true;
                 } else {
                     // Server is idle.
                     stopRunStatusPolling();
@@ -1141,9 +1144,12 @@
                     }
                     setButtonsRunning(false);
                     if (!reason) setStatus('', 'idle');
+                    reconnectAttempt = 0;
+                    return false;
                 }
             } catch {
                 // ignore
+                return null;
             }
         }
 
@@ -1156,18 +1162,23 @@
             }
         }
 
-        async function runStream(url) {
+        async function runStream(url, opts) {
+            const preserveLogs = !!opts?.preserveLogs;
             // If a stream is open, stop it first (prevent multiple parallel runs)
             if (currentStream) {
                 currentStream.close();
                 currentStream = null;
             }
 
+            lastStreamUrl = url;
+
             setButtonsRunning(true);
-            runStartMs = Date.now();
-            lastKnownCommand = null;
-            setStatus('warn', 'running');
-            clearLogs();
+            if (!preserveLogs) {
+                runStartMs = Date.now();
+                lastKnownCommand = null;
+                clearLogs();
+            }
+            setStatus('warn', preserveLogs ? 'reconnecting' : 'running');
 
             const ok = await ensureServerUp();
             if (!ok) {
@@ -1252,7 +1263,22 @@
                     currentStream = null;
                     // On Render/Cloudflare the SSE connection can drop even while the run continues.
                     // Poll server status to keep UI in sync and keep Stop enabled.
-                    syncRunStatus('stream disconnected').catch(() => {
+                    syncRunStatus('stream disconnected').then((running) => {
+                        if (running) {
+                            // Auto-reattach to the running stream.
+                            reconnectAttempt++;
+                            const delayMs = Math.min(30_000, 1500 * reconnectAttempt);
+                            appendLog(`Reconnecting in ${Math.round(delayMs / 1000)}s…`);
+                            setTimeout(() => {
+                                if (!lastStreamUrl) return;
+                                // Preserve logs; server will replay buffered lines too.
+                                runStream(lastStreamUrl, { preserveLogs: true }).catch(() => { });
+                            }, delayMs);
+                            return;
+                        }
+                        setButtonsRunning(false);
+                        setStatus('bad', 'stream error');
+                    }).catch(() => {
                         setButtonsRunning(false);
                         setStatus('bad', 'stream error');
                     });

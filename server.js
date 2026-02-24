@@ -192,11 +192,17 @@ function bufferLogLine(text) {
 function attachSseClient(res, { replay = false } = {}) {
     writeSseHeaders(res);
 
+    // Reduce latency/buffering for SSE.
+    try {
+        res.socket?.setNoDelay?.(true);
+    } catch { }
+
     // Keep-alive pings so proxies (Render, etc.) don't close idle SSE connections.
     const pingTimer = setInterval(() => {
         try {
-            // SSE comment line (doesn't trigger an event)
-            res.write(`: ping ${Date.now()}\n\n`);
+            // SSE comment line (doesn't trigger an event).
+            // Include padding to reduce the chance of intermediate proxies buffering tiny chunks.
+            res.write(`: ping ${Date.now()} ${' '.repeat(2048)}\n\n`);
         } catch { }
     }, 15_000);
 
