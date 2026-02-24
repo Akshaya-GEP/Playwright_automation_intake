@@ -1236,6 +1236,15 @@
                 }
             });
 
+            es.addEventListener('server_info', (ev) => {
+                try {
+                    const payload = JSON.parse(ev.data || '{}');
+                    appendLog(payload?.message || 'Info');
+                } catch {
+                    appendLog(String(ev.data || 'Info'));
+                }
+            });
+
             es.addEventListener('error', (ev) => {
                 // In SSE, 'error' may fire on reconnect attempt as well; treat as fatal if readyState is CLOSED.
                 if (es.readyState === EventSource.CLOSED) {

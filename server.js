@@ -116,6 +116,12 @@ let currentStreamChild = null; // spawn()-based run (SSE streaming)
 let currentRunCommand = null;
 let currentRunStartedAtMs = null;
 
+// SSE fan-out + reconnect support (Render/Cloudflare may drop long-lived streams).
+// We buffer recent log lines so a reconnecting client can "catch up".
+const RUN_LOG_MAX_LINES = Number(process.env.RUN_LOG_MAX_LINES || 2000);
+const runLogBuffer = [];
+const sseClients = new Set(); // { res, pingTimer }
+
 function getRunStatus() {
     if (!isRunning) return { isRunning: false };
     const runningForMs = currentRunStartedAtMs ? Date.now() - currentRunStartedAtMs : null;
@@ -124,21 +130,78 @@ function getRunStatus() {
         command: currentRunCommand,
         runningForSec: runningForMs !== null ? Math.round(runningForMs / 1000) : null,
         pid: currentStreamChild?.pid || currentChild?.pid || null,
+        clients: sseClients.size,
     };
 }
 
 function writeSseHeaders(res) {
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
+        // no-transform helps prevent proxies from buffering/chunking SSE.
+        'Cache-Control': 'no-cache, no-transform',
         'Connection': 'keep-alive',
         'Access-Control-Allow-Origin': '*',
+        // Some reverse proxies buffer responses unless explicitly disabled.
+        'X-Accel-Buffering': 'no',
     });
     if (typeof res.flushHeaders === 'function') res.flushHeaders();
 }
 
 function sseSend(res, event, data) {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
+function broadcastSse(event, data) {
+    for (const client of sseClients) {
+        try {
+            sseSend(client.res, event, data);
+        } catch { }
+    }
+}
+
+function bufferLogLine(text) {
+    runLogBuffer.push(text);
+    if (runLogBuffer.length > RUN_LOG_MAX_LINES) {
+        runLogBuffer.splice(0, runLogBuffer.length - RUN_LOG_MAX_LINES);
+    }
+}
+
+function attachSseClient(res, { replay = false } = {}) {
+    writeSseHeaders(res);
+
+    // Keep-alive pings so proxies (Render, etc.) don't close idle SSE connections.
+    const pingTimer = setInterval(() => {
+        try {
+            // SSE comment line (doesn't trigger an event)
+            res.write(`: ping ${Date.now()}\n\n`);
+        } catch { }
+    }, 15_000);
+
+    const client = { res, pingTimer };
+    sseClients.add(client);
+
+    if (replay && runLogBuffer.length) {
+        for (const line of runLogBuffer) {
+            try {
+                sseSend(res, 'line', { text: line });
+            } catch { }
+        }
+    }
+
+    res.on('close', () => {
+        clearInterval(pingTimer);
+        sseClients.delete(client);
+    });
+
+    return client;
+}
+
+function endAllSseClients() {
+    for (const client of sseClients) {
+        clearInterval(client.pingTimer);
+        try { client.res.end(); } catch { }
+    }
+    sseClients.clear();
 }
 
 function killProcessTree(pid) {
@@ -274,34 +337,27 @@ app.post('/run-all', (_req, res) => {
  * line as an SSE event so the browser can display live progress.
  */
 function streamCommand(command, res) {
-    // IMPORTANT: EventSource treats non-200 responses as a network error and closes without exposing the body.
-    // So even "error" cases should return 200 and send an SSE error event.
-    writeSseHeaders(res);
+    // Always attach the client first.
+    // If a run is in progress, we "join" it and replay buffered lines so reconnect works.
+    attachSseClient(res, { replay: isRunning });
 
     if (isRunning) {
-        sseSend(res, 'server_error', {
-            message: 'A test run is already in progress. Please wait until it finishes.',
+        sseSend(res, 'server_info', {
+            message: 'A test run is already in progress. Attached to live output.',
             ...getRunStatus(),
         });
-        sseSend(res, 'done', { exitCode: null, success: false });
-        return res.end();
+        // Send the current command as a start event for this client.
+        sseSend(res, 'start', { command: currentRunCommand });
+        return;
     }
 
+    // Start a new run and broadcast to all connected clients.
     isRunning = true;
     currentRunCommand = command;
     currentRunStartedAtMs = Date.now();
+    runLogBuffer.length = 0;
 
-    // Keep-alive pings so proxies (Render, etc.) don't close idle SSE connections.
-    const pingTimer = setInterval(() => {
-        try {
-            // SSE comment line (doesn't trigger an event)
-            res.write(`: ping ${Date.now()}\n\n`);
-        } catch { }
-    }, 15_000);
-
-    const send = (event, data) => sseSend(res, event, data);
-
-    send('start', { command });
+    broadcastSse('start', { command });
     console.log(`[stream] Executing: ${command}`);
 
     // IMPORTANT: Do NOT detach on Linux for SSE runs. Render/proxies may drop the SSE connection;
@@ -312,44 +368,34 @@ function streamCommand(command, res) {
     child.stdout.on('data', (chunk) => {
         const lines = chunk.toString().split(/\r?\n/);
         for (const line of lines) {
-            if (line.trim()) send('line', { text: line });
+            if (!line.trim()) continue;
+            bufferLogLine(line);
+            broadcastSse('line', { text: line });
         }
     });
 
     child.stderr.on('data', (chunk) => {
         const lines = chunk.toString().split(/\r?\n/);
         for (const line of lines) {
-            if (line.trim()) send('line', { text: line });
+            if (!line.trim()) continue;
+            bufferLogLine(line);
+            broadcastSse('line', { text: line });
         }
     });
 
-    child.on('exit', (code) => {
+    const finish = (payload) => {
+        broadcastSse('done', payload);
+        endAllSseClients();
         isRunning = false;
         currentStreamChild = null;
         currentRunCommand = null;
         currentRunStartedAtMs = null;
-        clearInterval(pingTimer);
-        send('done', { exitCode: code, success: code === 0 });
-        res.end();
-    });
+    };
 
+    child.on('exit', (code) => finish({ exitCode: code, success: code === 0 }));
     child.on('error', (err) => {
-        isRunning = false;
-        currentStreamChild = null;
-        currentRunCommand = null;
-        currentRunStartedAtMs = null;
-        clearInterval(pingTimer);
-        send('server_error', { message: err.message });
-        send('done', { exitCode: null, success: false });
-        res.end();
-    });
-
-    // Clean up if client disconnects
-    res.on('close', () => {
-        clearInterval(pingTimer);
-        // Keep the test running even if the SSE client disconnects (common on Render/proxies/page reloads).
-        // The run can still be observed via server logs, and stopped via /stop-run.
-        console.log('[stream] SSE client disconnected; leaving test process running.');
+        broadcastSse('server_error', { message: err.message });
+        finish({ exitCode: null, success: false });
     });
 }
 
@@ -368,6 +414,11 @@ app.post('/stop-run', async (_req, res) => {
     currentStreamChild = null;
     currentRunCommand = null;
     currentRunStartedAtMs = null;
+
+    // Notify any connected SSE clients that the run was stopped.
+    broadcastSse('server_error', { message: 'Run stopped by user.' });
+    broadcastSse('done', { exitCode: null, success: false });
+    endAllSseClients();
 
     if (!killed) {
         return res.status(500).json({ success: false, error: 'Failed to stop the running process (best-effort).' });
