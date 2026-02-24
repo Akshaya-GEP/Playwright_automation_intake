@@ -12,7 +12,7 @@ const authDir = dirname(STORAGE_STATE);
  * Runs once before all tests to authenticate and save the browser storage state.
  * All subsequent tests will reuse this authenticated session.
  */
-setup('authenticate', async ({ page }) => {
+setup('authenticate', async ({ page }, testInfo) => {
   const missing = getMissingRequiredEnvVars();
   setup.skip(
     missing.length > 0,
@@ -31,9 +31,28 @@ setup('authenticate', async ({ page }) => {
   }
 
   // Navigate to the base URL and log in
-  await loginPage.goto();
-  await loginPage.login(env.userId, env.password);
-  await loginPage.assertLoggedIn();
+  try {
+    await loginPage.goto();
+    await loginPage.login(env.userId, env.password);
+    await loginPage.assertLoggedIn();
+  } catch (err) {
+    // Add high-signal debug info for CI/PaaS (Render) where you can't see the browser.
+    const url = page.url();
+    const title = await page.title().catch(() => '');
+    console.log(`[auth.setup] authentication failed. url=${url} title=${JSON.stringify(title)} error=${(err as Error)?.message || String(err)}`);
+
+    const png = await page.screenshot({ fullPage: true }).catch(() => null);
+    if (png) {
+      await testInfo.attach('auth-failure-screenshot', { body: png, contentType: 'image/png' });
+    }
+
+    const html = await page.content().catch(() => null);
+    if (html) {
+      await testInfo.attach('auth-failure-page.html', { body: Buffer.from(html, 'utf-8'), contentType: 'text/html' });
+    }
+
+    throw err;
+  }
 
   // Wait for the app to fully load after login (reduced timeout for faster completion)
   await page.waitForLoadState('domcontentloaded', { timeout: 10_000 }).catch(() => {});
