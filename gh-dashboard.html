@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playwright Automation Dashboard</title>
+    <style>
+        :root {
+            --font-sans: "Segoe UI Variable", "Segoe UI", Inter, ui-sans-serif, system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+            --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+            --bg0: #f6f7fb;
+            --bg1: #ffffff;
+            --panel: rgba(255, 255, 255, 0.92);
+            --border: rgba(17, 24, 39, 0.10);
+            --text: #0f172a;
+            --muted: rgba(15, 23, 42, 0.65);
+            --muted2: rgba(15, 23, 42, 0.50);
+            --shadow: 0 12px 40px rgba(15, 23, 42, 0.10);
+            --primary: #2563eb;
+            --primary-rgb: 37, 99, 235;
+            --ok: #22c55e;
+            --ok-bg: rgba(34, 197, 94, 0.12);
+            --warn: #f59e0b;
+            --warn-bg: rgba(245, 158, 11, 0.12);
+            --bad: #ef4444;
+            --bad-bg: rgba(239, 68, 68, 0.10);
+            --info: #3b82f6;
+            --info-bg: rgba(59, 130, 246, 0.10);
+            --focus: 0 0 0 3px rgba(59, 130, 246, 0.22);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--text);
+            font-family: var(--font-sans);
+            background:
+                radial-gradient(900px 500px at 20% 0%, rgba(var(--primary-rgb), 0.10), transparent 60%),
+                radial-gradient(800px 400px at 80% 10%, rgba(96, 165, 250, 0.10), transparent 58%),
+                linear-gradient(180deg, var(--bg0), var(--bg1));
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 28px 20px;
+        }
+
+        /* ── Header ── */
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .header h1 {
+            margin: 0 0 6px;
+            font-size: 22px;
+            font-weight: 800;
+        }
+        .header p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .config-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+            font-size: 12px;
+            color: var(--muted2);
+        }
+        .config-bar a { color: var(--primary); text-decoration: none; }
+        .config-bar a:hover { text-decoration: underline; }
+        .config-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--ok);
+            display: inline-block;
+        }
+        .config-dot.off { background: var(--bad); }
+
+        /* ── Cards ── */
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+        .card-header {
+            padding: 16px 18px 0;
+        }
+        .card-title {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 800;
+        }
+        .card-desc {
+            margin: 5px 0 0;
+            font-size: 12px;
+            color: var(--muted);
+        }
+        .card-body {
+            padding: 16px 18px;
+        }
+
+        /* ── Trigger Section ── */
+        .trigger-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            flex: 1;
+            min-width: 200px;
+        }
+        .field label {
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 600;
+        }
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(15, 23, 42, 0.14);
+            background: #fff;
+            color: var(--text);
+            font-size: 14px;
+            outline: none;
+        }
+        select:focus { box-shadow: var(--focus); border-color: rgba(59, 130, 246, 0.5); }
+        optgroup { font-weight: 700; color: rgba(15, 23, 42, 0.9); }
+        option { color: var(--text); }
+
+        button {
+            padding: 10px 18px;
+            background: #fff;
+            color: var(--text);
+            border: 1px solid rgba(15, 23, 42, 0.16);
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.12s, transform 0.05s;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        button:hover { background: #f9fafb; }
+        button:active { transform: translateY(1px); }
+        button:disabled { opacity: 0.55; cursor: not-allowed; }
+        button:focus { box-shadow: var(--focus); }
+
+        .btn-primary {
+            background: rgba(var(--primary-rgb), 0.10);
+            border-color: rgba(var(--primary-rgb), 0.30);
+            color: #1d4ed8;
+        }
+        .btn-primary:hover { background: rgba(var(--primary-rgb), 0.16); }
+
+        .btn-ok {
+            background: var(--ok-bg);
+            border-color: rgba(34, 197, 94, 0.30);
+        }
+        .btn-ok:hover { background: rgba(34, 197, 94, 0.18); }
+
+        .btn-sm {
+            padding: 6px 10px;
+            font-size: 11px;
+            border-radius: 8px;
+        }
+
+        /* ── Status Banner ── */
+        .status-banner {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 14px;
+        }
+        .status-banner.show { display: flex; }
+        .status-banner.info { background: var(--info-bg); color: #1e40af; }
+        .status-banner.ok { background: var(--ok-bg); color: #166534; }
+        .status-banner.warn { background: var(--warn-bg); color: #92400e; }
+        .status-banner.bad { background: var(--bad-bg); color: #991b1b; }
+        .spinner {
+            width: 16px; height: 16px;
+            border: 2.5px solid rgba(0,0,0,0.12);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Runs Table ── */
+        .runs-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .runs-table th {
+            text-align: left;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        .runs-table td {
+            padding: 10px 10px;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.05);
+            vertical-align: middle;
+        }
+        .runs-table tr:last-child td { border-bottom: 0; }
+        .runs-table tr:hover td { background: rgba(59, 130, 246, 0.03); }
+
+        /* ── Badges ── */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .badge.queued { background: rgba(148, 163, 184, 0.15); color: #475569; }
+        .badge.in_progress { background: var(--warn-bg); color: #92400e; }
+        .badge.success { background: var(--ok-bg); color: #166534; }
+        .badge.failure { background: var(--bad-bg); color: #991b1b; }
+        .badge.cancelled { background: rgba(148, 163, 184, 0.15); color: #64748b; }
+
+        .badge-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+        }
+        .badge.queued .badge-dot { background: #94a3b8; }
+        .badge.in_progress .badge-dot { background: var(--warn); animation: pulse 1.2s ease infinite; }
+        .badge.success .badge-dot { background: var(--ok); }
+        .badge.failure .badge-dot { background: var(--bad); }
+        .badge.cancelled .badge-dot { background: #94a3b8; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        .actions-cell {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        /* ── Empty state ── */
+        .empty {
+            text-align: center;
+            padding: 32px 16px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        /* ── Footer ── */
+        .footer {
+            text-align: center;
+            margin-top: 16px;
+            font-size: 12px;
+            color: var(--muted2);
+        }
+        .footer a { color: var(--primary); text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+
+        /* ── Responsive ── */
+        @media (max-width: 600px) {
+            .trigger-row { flex-direction: column; }
+            .field { min-width: 0; }
+            .runs-table { font-size: 12px; }
+            .actions-cell { flex-direction: column; gap: 4px; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Playwright Automation Dashboard</h1>
+            <p>Trigger and monitor Playwright test runs via GitHub Actions.</p>
+            <div class="config-bar" id="configBar">
+                <span class="config-dot" id="configDot"></span>
+                <span id="configText">Checking connection...</span>
+                <a href="#" id="repoLink" target="_blank" rel="noopener noreferrer" style="display:none">Open repo</a>
+            </div>
+        </div>
+
+        <!-- Status Banner -->
+        <div class="status-banner" id="statusBanner">
+            <div class="spinner" id="statusSpinner"></div>
+            <span id="statusMsg"></span>
+        </div>
+
+        <!-- Trigger Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Run a Test</h2>
+                <p class="card-desc">Select an agent and trigger the workflow. Tests run headless on GitHub's cloud infrastructure.</p>
+            </div>
+            <div class="card-body">
+                <div class="trigger-row">
+                    <div class="field">
+                        <label for="agentSelect">Agent / Suite</label>
+                        <select id="agentSelect">
+                            <option value="" disabled selected>Select what to run</option>
+                            <option value="suite">Run entire test suite</option>
+                            <optgroup label="Supplier Offboarding">
+                                <option value="agent-1">Agent 1 &mdash; Supplier Offboarding (Microsoft)</option>
+                                <option value="agent-1.2">Agent 1.2 &mdash; Supplier Offboarding (Workday)</option>
+                            </optgroup>
+                            <optgroup label="Contract Amendment">
+                                <option value="agent-2">Agent 2 &mdash; Contract Amendment</option>
+                                <option value="agent-2.1">Agent 2.1 &mdash; Contract Amendment (Alt)</option>
+                            </optgroup>
+                            <optgroup label="Contract Termination">
+                                <option value="agent-3">Agent 3 &mdash; Contract Termination (Future)</option>
+                                <option value="agent-3.1">Agent 3.1 &mdash; Contract Termination (Immediate)</option>
+                            </optgroup>
+                            <optgroup label="Contract Extension">
+                                <option value="agent-4">Agent 4 &mdash; Contract Extension</option>
+                                <option value="agent-4.1">Agent 4.1 &mdash; Contract Extension (Alt)</option>
+                            </optgroup>
+                            <optgroup label="Supplier Profile Update">
+                                <option value="agent-5">Agent 5 &mdash; Supplier Profile Update</option>
+                                <option value="agent-5.1">Agent 5.1 &mdash; Supplier Profile Update (TC2)</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <button type="button" class="btn-primary" id="triggerBtn" onclick="triggerRun()">
+                        &#9654; Run
+                    </button>
+                    <button type="button" class="btn-sm" onclick="refreshRuns()">
+                        &#8635; Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Runs Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Recent Runs</h2>
+                <p class="card-desc">Showing the last 15 workflow runs. Auto-refreshes every 15 seconds when a run is in progress.</p>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <div id="runsContainer">
+                    <div class="empty">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            Powered by <a href="https://github.com/features/actions" target="_blank">GitHub Actions</a>
+            &middot; Tests run headless in the cloud &middot; Zero hosting cost
+        </div>
+    </div>
+
+    <script>
+        const API = '';
+        let pollTimer = null;
+        let isTriggering = false;
+
+        // ── Status banner ──
+        function showStatus(type, msg, showSpinner = false) {
+            const el = document.getElementById('statusBanner');
+            const spinner = document.getElementById('statusSpinner');
+            const text = document.getElementById('statusMsg');
+            el.className = `status-banner show ${type}`;
+            text.textContent = msg;
+            spinner.style.display = showSpinner ? 'block' : 'none';
+        }
+        function hideStatus() {
+            document.getElementById('statusBanner').className = 'status-banner';
+        }
+
+        // ── Config check ──
+        async function checkConfig() {
+            try {
+                const resp = await fetch(`${API}/api/config`);
+                const data = await resp.json();
+                const dot = document.getElementById('configDot');
+                const text = document.getElementById('configText');
+                const link = document.getElementById('repoLink');
+
+                if (data.configured) {
+                    dot.className = 'config-dot';
+                    text.textContent = `Connected to ${data.repo}`;
+                    if (data.repoUrl) {
+                        link.href = data.actionsUrl || data.repoUrl;
+                        link.style.display = 'inline';
+                    }
+                } else {
+                    dot.className = 'config-dot off';
+                    text.textContent = 'Not configured — set GITHUB_TOKEN and GITHUB_REPO env vars';
+                }
+            } catch {
+                document.getElementById('configDot').className = 'config-dot off';
+                document.getElementById('configText').textContent = 'Cannot reach server';
+            }
+        }
+
+        // ── Trigger workflow ──
+        async function triggerRun() {
+            const agent = document.getElementById('agentSelect').value;
+            if (!agent) {
+                showStatus('warn', 'Please select an agent or suite first.');
+                return;
+            }
+            if (isTriggering) return;
+
+            isTriggering = true;
+            document.getElementById('triggerBtn').disabled = true;
+            showStatus('info', `Triggering "${agent}"...`, true);
+
+            try {
+                const resp = await fetch(`${API}/api/trigger`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ agent }),
+                });
+                const data = await resp.json();
+
+                if (resp.ok && data.success) {
+                    showStatus('ok', data.message || 'Workflow triggered! Waiting for it to appear...');
+                    // Wait a few seconds then refresh (GitHub takes a moment to create the run)
+                    setTimeout(() => refreshRuns(), 4000);
+                    startPolling();
+                } else {
+                    showStatus('bad', data.error || 'Failed to trigger workflow.');
+                }
+            } catch (err) {
+                showStatus('bad', `Error: ${err.message}`);
+            } finally {
+                isTriggering = false;
+                document.getElementById('triggerBtn').disabled = false;
+            }
+        }
+
+        // ── Fetch & render runs ──
+        async function refreshRuns() {
+            try {
+                const resp = await fetch(`${API}/api/runs`);
+                const data = await resp.json();
+
+                if (!resp.ok) {
+                    document.getElementById('runsContainer').innerHTML =
+                        `<div class="empty" style="color:var(--bad)">${escHtml(data.error || 'Failed to load runs')}</div>`;
+                    return;
+                }
+
+                const runs = data.runs || [];
+                if (!runs.length) {
+                    document.getElementById('runsContainer').innerHTML =
+                        '<div class="empty">No workflow runs found yet. Trigger one above!</div>';
+                    return;
+                }
+
+                // Check if any run is active — if so, keep polling
+                const hasActive = runs.some(r => r.status === 'queued' || r.status === 'in_progress');
+                if (hasActive) {
+                    startPolling();
+                } else {
+                    stopPolling();
+                    // If we were waiting for a run to finish, clear the status
+                    const banner = document.getElementById('statusBanner');
+                    if (banner.classList.contains('info')) hideStatus();
+                }
+
+                renderRuns(runs);
+            } catch (err) {
+                document.getElementById('runsContainer').innerHTML =
+                    `<div class="empty" style="color:var(--bad)">Cannot reach server: ${escHtml(err.message)}</div>`;
+            }
+        }
+
+        function renderRuns(runs) {
+            let html = `<table class="runs-table">
+                <thead><tr>
+                    <th>Run</th>
+                    <th>Status</th>
+                    <th>Triggered</th>
+                    <th>By</th>
+                    <th>Actions</th>
+                </tr></thead><tbody>`;
+
+            for (const r of runs) {
+                const badge = statusBadge(r.status, r.conclusion);
+                const time = timeAgo(r.createdAt);
+                const title = r.displayTitle || `Run #${r.runNumber}`;
+
+                html += `<tr>
+                    <td><strong>#${r.runNumber}</strong> <span style="color:var(--muted);font-size:12px">${escHtml(title)}</span></td>
+                    <td>${badge}</td>
+                    <td style="color:var(--muted);font-size:12px;white-space:nowrap">${time}</td>
+                    <td style="color:var(--muted);font-size:12px">${escHtml(r.actor)}</td>
+                    <td>
+                        <div class="actions-cell">
+                            <a href="${escHtml(r.htmlUrl)}" target="_blank" rel="noopener noreferrer">
+                                <button type="button" class="btn-sm">View on GitHub</button>
+                            </a>
+                            ${r.status === 'completed' ? `<button type="button" class="btn-sm btn-ok" onclick="downloadReport(${r.id})">Download Report</button>` : ''}
+                        </div>
+                    </td>
+                </tr>`;
+            }
+
+            html += '</tbody></table>';
+            document.getElementById('runsContainer').innerHTML = html;
+        }
+
+        function statusBadge(status, conclusion) {
+            let cls = 'queued';
+            let label = status;
+
+            if (status === 'in_progress') {
+                cls = 'in_progress';
+                label = 'Running';
+            } else if (status === 'queued') {
+                cls = 'queued';
+                label = 'Queued';
+            } else if (status === 'completed') {
+                if (conclusion === 'success') { cls = 'success'; label = 'Passed'; }
+                else if (conclusion === 'failure') { cls = 'failure'; label = 'Failed'; }
+                else if (conclusion === 'cancelled') { cls = 'cancelled'; label = 'Cancelled'; }
+                else { cls = 'queued'; label = conclusion || 'Done'; }
+            }
+
+            return `<span class="badge ${cls}"><span class="badge-dot"></span>${label}</span>`;
+        }
+
+        // ── Download report artifact ──
+        async function downloadReport(runId) {
+            try {
+                showStatus('info', 'Fetching report artifact...', true);
+                const resp = await fetch(`${API}/api/artifacts/${runId}`);
+                const data = await resp.json();
+
+                if (!resp.ok) {
+                    showStatus('bad', data.error || 'Failed to fetch artifacts.');
+                    return;
+                }
+
+                const report = (data.artifacts || []).find(a => a.name === 'playwright-report');
+                if (!report) {
+                    showStatus('warn', 'No playwright-report artifact found for this run. It may have expired.');
+                    return;
+                }
+
+                if (report.expired) {
+                    showStatus('warn', 'Report artifact has expired (GitHub deletes artifacts after 90 days).');
+                    return;
+                }
+
+                // Trigger download via the proxy endpoint
+                window.open(`${API}/api/download/${report.id}`, '_blank');
+                hideStatus();
+            } catch (err) {
+                showStatus('bad', `Error: ${err.message}`);
+            }
+        }
+
+        // ── Auto-polling ──
+        function startPolling() {
+            if (pollTimer) return;
+            pollTimer = setInterval(() => refreshRuns(), 15000);
+        }
+        function stopPolling() {
+            if (!pollTimer) return;
+            clearInterval(pollTimer);
+            pollTimer = null;
+        }
+
+        // ── Helpers ──
+        function escHtml(s) {
+            return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function timeAgo(dateStr) {
+            const now = Date.now();
+            const then = new Date(dateStr).getTime();
+            const diffSec = Math.round((now - then) / 1000);
+
+            if (diffSec < 60) return `${diffSec}s ago`;
+            if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+            if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+            return `${Math.floor(diffSec / 86400)}d ago`;
+        }
+
+        // ── Init ──
+        checkConfig();
+        refreshRuns();
+    </script>
+</body>
+
+</html>
+
