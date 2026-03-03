@@ -310,25 +310,29 @@ export async function workflowAgent5(page: Page, _ctx: AgentContext) {
         if (uploadFile && uploadFile.trim()) {
             filePath = uploadFile.trim();
         } else {
-            const homeDir = os.homedir();
-            filePath = path.join(homeDir, 'Desktop', 'a.xlsx');
-            console.log(`No UPLOAD_FILE_5 specified, using default: ${filePath}`);
+            filePath = 'a.xlsx';
+            console.log(`No UPLOAD_FILE_5 specified, using default name: ${filePath}`);
         }
 
         if (!path.isAbsolute(filePath)) {
-            const projectRoot = process.cwd();
-            const resolvedPath = path.resolve(projectRoot, filePath);
-            if (fs.existsSync(resolvedPath)) {
-                filePath = resolvedPath;
+            const testDataPath = path.resolve(process.cwd(), 'automation', 'test-data', filePath);
+            const desktopPath = path.join(os.homedir(), 'Desktop', path.basename(filePath));
+            const tmpFallback = path.join(os.tmpdir(), path.basename(filePath));
+
+            if (fs.existsSync(testDataPath)) {
+                filePath = testDataPath;
+            } else if (fs.existsSync(desktopPath)) {
+                filePath = desktopPath;
             } else {
-                const homeDir = os.homedir();
-                const desktopPath = path.join(homeDir, 'Desktop', path.basename(filePath));
-                if (fs.existsSync(desktopPath)) {
-                    filePath = desktopPath;
-                } else {
-                    console.warn(`File not found at ${resolvedPath} or ${desktopPath}. Please ensure the file exists.`);
-                }
+                console.log(`File not found at ${testDataPath} or ${desktopPath}. Creating dummy file at ${tmpFallback}`);
+                fs.writeFileSync(tmpFallback, 'dummy file content for upload');
+                filePath = tmpFallback;
             }
+        } else if (!fs.existsSync(filePath)) {
+            const tmpFallback = path.join(os.tmpdir(), path.basename(filePath));
+            console.warn(`Absolute file ${filePath} does not exist. Creating dummy file at ${tmpFallback}`);
+            fs.writeFileSync(tmpFallback, 'dummy file content for upload');
+            filePath = tmpFallback;
         }
 
         if (fs.existsSync(filePath)) {
