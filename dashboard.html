@@ -822,115 +822,119 @@
         <div class="page">
             <div class="main">
                 <div class="card primary" id="runAgentsCard">
-                <div class="card-header">
-                    <div class="card-title-row">
-                        <h2 class="card-title">Run a single agent</h2>
-                        <div class="header-actions">
-                            <label class="toggle" title="Enable to stream progress and show the live log panel">
-                                <input type="checkbox" id="liveLogsToggle" />
-                                Live logs
-                            </label>
+                    <div class="card-header">
+                        <div class="card-title-row">
+                            <h2 class="card-title">Run a single agent</h2>
+                            <div class="header-actions">
+                                <label class="toggle" title="Enable to stream progress and show the live log panel">
+                                    <input type="checkbox" id="liveLogsToggle" />
+                                    Live logs
+                                </label>
+                            </div>
                         </div>
+                        <p class="card-desc">
+                            Select an agent and run its automated test in a visible browser.
+                        </p>
                     </div>
-                    <p class="card-desc">
-                        Select an agent and run its automated test in a visible browser.
-                    </p>
-                </div>
-                <div class="card-body">
-                    <div class="row row-wrap center">
-                        <div class="field agent-field">
-                            <label for="agentSelect" class="sr-only">Agent</label>
-                            <select id="agentSelect">
-                                <option value="" disabled selected>Select an Agent</option>
-                                <optgroup label="Supplier Offboarding Assistant">
-                                    <option value="1">1 — Supplier Offboarding (Microsoft)</option>
-                          
-                                    <option value="1.2">1.2 — Supplier Offboarding (Workday)</option>
-                                </optgroup>
-                                <optgroup label="Contract Amendment Assistant">
-                                    <option value="2">2 — Contract Amendment</option>
-                                    <option value="2.1">2.1 — Contract Amendment (Alt)</option>
-                                </optgroup>
-                                <optgroup label="Contract Termination Assistant">
-                                    <option value="3">3 — Contract Termination (Future)</option>
-                                    <option value="3.1">3.1 — Contract Termination (Immediate)</option>
-                                </optgroup>
-                                <optgroup label="Contract Extension Assistant">
-                                    <option value="4">4 — Contract Extension</option>
-                                    <option value="4.1">4.1 — Contract Extension (Alt)</option>
-                                </optgroup>
-                                <optgroup label="Supplier Profile Update Assistant">
-                                    <option value="5">5 — Supplier Profile Update</option>
-                                    <option value="5.1">5.1 — Supplier Profile Update (TC2)</option>
-                                </optgroup>
-                            </select>
+                    <div class="card-body">
+                        <div class="row row-wrap center">
+                            <div class="field agent-field">
+                                <label for="agentSelect" class="sr-only">Agent</label>
+                                <select id="agentSelect">
+                                    <option value="" disabled selected>Select an Agent</option>
+                                    <optgroup label="Supplier Offboarding Assistant">
+                                        <option value="1">1.1 Supplier Offboarding Assistant</option>
+
+                                        <option value="1.2">1.2 — Supplier Offboarding Assistant</option>
+                                    </optgroup>
+                                    <optgroup label="Contract Amendment Assistant">
+                                        <option value="2">2.1— Contract Amendment Assistant</option>
+                                        <option value="2.1">2.2 — Contract Amendment Assistant</option>
+                                    </optgroup>
+                                    <optgroup label="Contract Termination Assistant">
+                                        <option value="3">3.1 — Contract Termination Assistant</option>
+                                        <option value="3.1">3.2 — Contract Termination Assistant</option>
+                                    </optgroup>
+                                    <optgroup label="Contract Extension Assistant">
+                                        <option value="4">4.1 — Contract Extension Assistant</option>
+                                        <option value="4.1">4.2 — Contract Extension Assistant (Alt)</option>
+                                    </optgroup>
+                                    <optgroup label="Supplier Profile Update Assistant">
+                                        <option value="5">5.1 — Supplier Profile Update Assistant</option>
+                                        <option value="5.1">5.2 — Supplier Profile Update Assistant</option>
+                                    </optgroup>
+                                </select>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="row row-wrap center">
-                        <button type="button" onclick="runSelectedAgent()" id="runAgentBtn">
-                            ▶ Run selected agent
-                        </button>
-                        <button type="button" class="btn-danger" onclick="stopRun()" id="stopBtn" disabled>
-                            ■ Stop
-                        </button>
-
-                    </div>
-                </div>
-                <div class="statusbar">
-                    <span class="dot" id="statusDot"></span>
-                    <div class="status-text" id="statusText">
-                        Status: <strong>idle</strong>
-                    </div>
-                </div>
-                </div>
-
-            <div class="card secondary suite-card">
-                <div class="card-header">
-                    <div class="card-title-row">
-                        <h2 class="card-title">Run entire test suite</h2>
-                    </div>
-                    <p class="card-desc">Run all Playwright specs in <strong>headed</strong> or <strong>headless</strong> mode.</p>
-                </div>
-                <div class="card-body">
-                    <div class="row row-wrap center">
-                        <div class="seg runmode compact" role="group" aria-label="Suite run mode">
-                            <button id="suiteHeadedBtn" type="button" aria-pressed="true" onclick="setSuiteMode('headed')"
-                                title="Browser visible">
-                                <span class="rm-title">Headed</span>
+                        <div class="row row-wrap center">
+                            <button type="button" onclick="runSelectedAgent()" id="runAgentBtn">
+                                ▶ Run selected agent
                             </button>
-                            <button id="suiteHeadlessBtn" type="button" aria-pressed="false" onclick="setSuiteMode('headless')"
-                                title="No browser UI">
-                                <span class="rm-title">Headless</span>
+                            <button type="button" class="btn-danger" onclick="stopRun()" id="stopBtn" disabled>
+                                ■ Stop
+                            </button>
+
+                        </div>
+                    </div>
+                    <div class="statusbar">
+                        <span class="dot" id="statusDot"></span>
+                        <div class="status-text" id="statusText">
+                            Status: <strong>idle</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card secondary suite-card">
+                    <div class="card-header">
+                        <div class="card-title-row">
+                            <h2 class="card-title">Run entire test suite</h2>
+                        </div>
+                        <p class="card-desc">Run all Playwright specs in <strong>headed</strong> or
+                            <strong>headless</strong> mode.</p>
+                    </div>
+                    <div class="card-body">
+                        <div class="row row-wrap center">
+                            <div class="seg runmode compact" role="group" aria-label="Suite run mode">
+                                <button id="suiteHeadedBtn" type="button" aria-pressed="true"
+                                    onclick="setSuiteMode('headed')" title="Browser visible">
+                                    <span class="rm-title">Headed</span>
+                                </button>
+                                <button id="suiteHeadlessBtn" type="button" aria-pressed="false"
+                                    onclick="setSuiteMode('headless')" title="No browser UI">
+                                    <span class="rm-title">Headless</span>
+                                </button>
+                            </div>
+                            <button type="button" class="btn-ok" onclick="runSuite()" id="runSuiteBtn"
+                                title="Run all Playwright tests">
+                                ▶ Run all tests
                             </button>
                         </div>
-                        <button type="button" class="btn-ok" onclick="runSuite()" id="runSuiteBtn" title="Run all Playwright tests">
-                            ▶ Run all tests
-                        </button>
-                    </div>
-                    <div class="hint">
-                        If Live logs is enabled, you’ll see streaming output and can Stop instantly.
-                    </div>
-                    <div class="row row-wrap center">
-                        <button type="button" onclick="openReport()" id="reportBtn" title="Open latest Playwright report">
-                            Report
-                        </button>
-                        <button type="button" onclick="startDebugUi()" id="debugBtn" title="Start Playwright UI mode on localhost:9323">
-                            Debug UI
-                        </button>
+                        <div class="hint">
+                            If Live logs is enabled, you’ll see streaming output and can Stop instantly.
+                        </div>
+                        <div class="row row-wrap center">
+                            <button type="button" onclick="openReport()" id="reportBtn"
+                                title="Open latest Playwright report">
+                                Report
+                            </button>
+                            <button type="button" onclick="startDebugUi()" id="debugBtn"
+                                title="Start Playwright UI mode on localhost:9323">
+                                Debug UI
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="footer">
-                <div>
-                    If a run hangs, click <strong>Stop</strong> to cancel the server-side process.
+                <div class="footer">
+                    <div>
+                        If a run hangs, click <strong>Stop</strong> to cancel the server-side process.
+                    </div>
+                    <div>
+                        Runner: <a href="/" id="dashboardLink">Dashboard</a> · <a href="/report/" target="_blank"
+                            rel="noopener noreferrer">Report</a>
+                    </div>
                 </div>
-                <div>
-                    Runner: <a href="/" id="dashboardLink">Dashboard</a> · <a href="/report/" target="_blank"
-                        rel="noopener noreferrer">Report</a>
-                </div>
-            </div>
             </div>
 
             <aside class="sidebar" id="logsSidebar" aria-label="Live logs sidebar" aria-hidden="true">

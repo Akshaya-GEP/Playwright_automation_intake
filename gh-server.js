@@ -74,8 +74,17 @@ async function gh(endpoint, opts = {}) {
 
 // ── POST /api/trigger — Trigger a workflow run ──
 const VALID_AGENTS = [
-    'suite', 'agent-1', 'agent-1.2', 'agent-2', 'agent-2.1',
-    'agent-3', 'agent-3.1', 'agent-4', 'agent-4.1', 'agent-5', 'agent-5.1',
+    'suite',
+    'agent-1.1 Supplier Offboarding Assistant',
+    'agent-1.2 Supplier Offboarding Assistant',
+    'agent-2.1 Contract Amendment Assistant',
+    'agent-2.2 Contract Amendment Assistant',
+    'agent-3.1 Contract Termination Assistant',
+    'agent-3.2 Contract Termination Assistant',
+    'agent-4.1 Contract Extension Assistant',
+    'agent-4.2 Contract Extension Assistant',
+    'agent-5.1 Supplier Profile Update Assistant',
+    'agent-5.2 Supplier Profile Update Assistant',
 ];
 
 app.post('/api/trigger', async (req, res) => {
