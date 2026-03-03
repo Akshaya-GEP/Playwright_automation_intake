@@ -1,4 +1,5 @@
 name: Playwright (manual)
+run-name: ${{ inputs.run }}
 
 on:
   workflow_dispatch:

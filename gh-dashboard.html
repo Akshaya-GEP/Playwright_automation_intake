@@ -498,7 +498,6 @@
                     <th>Run</th>
                     <th>Status</th>
                     <th>Triggered</th>
-                    <th>By</th>
                     <th>Actions</th>
                 </tr></thead><tbody>`;
 
@@ -511,7 +510,6 @@
                     <td><strong>#${r.runNumber}</strong> <span style="color:var(--muted);font-size:12px">${escHtml(title)}</span></td>
                     <td>${badge}</td>
                     <td style="color:var(--muted);font-size:12px;white-space:nowrap">${time}</td>
-                    <td style="color:var(--muted);font-size:12px">${escHtml(r.actor)}</td>
                     <td>
                         <div class="actions-cell">
                             <a href="${escHtml(r.htmlUrl)}" target="_blank" rel="noopener noreferrer">
