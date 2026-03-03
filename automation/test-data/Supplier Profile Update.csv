@@ -1,0 +1,4 @@
+SNO,QUERY,SUPPLIER_NAME,SUPPLIER_CODE,UPDATE_TYPE,REASON_ACTION,UPLOAD_FILE
+5,I want to update supplier name Microsoft,Microsoft,GEP-000010742,Block / Unblock Supplier,Approve supplier,a.xlsx
+5.1,I want to update supplier name Microsoft,Microsoft,GEP-000010742,Exception Approval Required,Approve supplier,a.xlsx
+

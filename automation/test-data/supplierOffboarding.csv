@@ -1,0 +1,6 @@
+SNO,QUERY,SUPPLIER NAME,SUPPLIER CODE,OFFBOARDREASON
+1,"i want to offboard supplier microsoft",,,Not approved by TPRM
+1.1,"i want to offboard supplier adobe",,,Not approved by TPRM
+1.2,"i want to offboard supplier workday",,,Not approved by TPRM
+1.3,"i want to offboard supplier with identification number GEP-000010742",,GEP-000010742,Not approved by TPRM
+
