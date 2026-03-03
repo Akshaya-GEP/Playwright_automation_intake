@@ -86,7 +86,7 @@ app.post('/api/trigger', async (req, res) => {
 
         const resp = await gh(`/repos/${GITHUB_REPO}/actions/workflows/${GITHUB_WORKFLOW}/dispatches`, {
             method: 'POST',
-            body: JSON.stringify({ ref: 'main', inputs: { run: agent } }),
+            body: JSON.stringify({ ref: 'master', inputs: { run: agent } }),
             headers: { 'Content-Type': 'application/json' },
         });
 
