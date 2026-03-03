@@ -340,26 +340,40 @@ export async function workflowAgent5(page: Page, _ctx: AgentContext) {
             // IMPORTANT: do NOT upload via a global input[type="file"], because many apps have a hidden
             // file input for the chat composer (which would attach the file to the chat area).
             // We must target the upload section's Browse control + its file input.
-            const attachmentsLabel = page.getByText(/Please select attachments/i).first();
-            await attachmentsLabel.waitFor({ state: 'visible', timeout: 60_000 }).catch(() => { });
+            const attachmentsLabel = page.getByText(/Please select attachments|upload.*attachment|attachments/i).filter({ hasNot: page.locator('input, button, a') }).first();
+            await attachmentsLabel.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => { });
 
             // Find the upload widget container starting from the "*Please select attachments" label.
             // Prefer a direct ancestor that contains "Add" and/or "Choose File". Fallback to walking up.
             let uploadContainer: Locator = attachmentsLabel.locator(
-                'xpath=ancestor::*[.//button[normalize-space()="Add"] or .//button[contains(normalize-space(.), "Choose File")]][1]',
+                'xpath=ancestor::*[.//button[normalize-space()="Add"] or .//button[contains(normalize-space(.), "Choose File")] or .//input[@type="file"]][1]',
             );
-            const uploadContainerCount = await uploadContainer.count().catch(() => 0);
+            let uploadContainerCount = await uploadContainer.count().catch(() => 0);
             if (uploadContainerCount === 0) {
-                // Fallback: walk up until the container includes Add.
+                // Fallback: walk up until the container includes Add or a file input.
                 let cur: Locator = attachmentsLabel;
                 for (let i = 0; i < 15; i++) {
                     cur = cur.locator('..');
+                    if (await cur.count().catch(() => 0) === 0) break;
+
                     const hasAddByRole = (await cur.getByRole('button', { name: /^add$/i }).count().catch(() => 0)) > 0;
                     const hasAddByText = (await cur.locator('button:has-text("Add")').count().catch(() => 0)) > 0;
-                    if (hasAddByRole || hasAddByText) {
+                    const hasFileInput = (await cur.locator('input[type="file"]').count().catch(() => 0)) > 0;
+                    if (hasAddByRole || hasAddByText || hasFileInput) {
                         uploadContainer = cur;
+                        uploadContainerCount = 1;
                         break;
                     }
+                }
+            }
+
+            // Extreme fallback if attachmentsLabel is just nowhere to be found
+            if (uploadContainerCount === 0) {
+                const anyFileInput = page.locator('input[type="file"]').first();
+                if (await anyFileInput.isVisible({ timeout: 1000 }).catch(() => false) || await anyFileInput.count() > 0) {
+                    uploadContainer = anyFileInput.locator('xpath=ancestor::div[1]').first();
+                } else {
+                    uploadContainer = page.locator('body');
                 }
             }
 
@@ -431,7 +445,7 @@ export async function workflowAgent5(page: Page, _ctx: AgentContext) {
                         const elements = Array.from(root.querySelectorAll('a, button, span, div, label'));
                         for (const el of elements) {
                             const text = (el.textContent || '').trim();
-                            if (/^Browse$/i.test(text) && !el.closest('input')) {
+                            if ((/^Browse$/i.test(text) || /^Choose File$/i.test(text) || /^Select File$/i.test(text)) && !el.closest('input')) {
                                 const htmlEl = el as HTMLElement;
                                 htmlEl.scrollIntoView({ behavior: 'instant', block: 'center' });
                                 htmlEl.click();
@@ -448,6 +462,19 @@ export async function workflowAgent5(page: Page, _ctx: AgentContext) {
                     }
                 } catch (e) {
                     console.log('Strategy 3 (page.evaluate Browse click) failed, continuing...');
+                }
+            }
+
+            // Strategy 4: Try just clicking the file input wrapper if it's styled as a button
+            if (!browseClicked) {
+                try {
+                    const fallbackBtn = uploadContainer.locator('button').filter({ hasText: /browse|choose/i }).first();
+                    if (await fallbackBtn.isVisible().catch(() => false)) {
+                        await fallbackBtn.click({ timeout: 5000, force: true });
+                        browseClicked = true;
+                    }
+                } catch (e) {
+                    console.log('Strategy 4 failed, continuing...');
                 }
             }
 

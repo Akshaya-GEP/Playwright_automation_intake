@@ -46,7 +46,7 @@ export async function workflowAgent4(page: Page, _ctx: AgentContext, data: Contr
     .filter({ hasNot: page.locator('code') })
     .first()
     .waitFor({ state: 'visible', timeout: 15_000 })
-    .catch(() => {});
+    .catch(() => { });
 
   await handleExtensionDateSelection(page, data.extensionDate);
   aiEventsCount = await waitForAiEvents(page, aiEventsCount).catch(() => aiEventsCount);

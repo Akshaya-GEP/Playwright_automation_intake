@@ -11,11 +11,13 @@ export async function handleExtensionDateSelection(page: Page, dateStr: string) 
     console.log(`Setting extension date to: ${dateStr}`);
 
     // The "Extension Date" widget can vary slightly across builds; find it by label text first.
-    const labelRe = /extension\s+date/i;
+    const labelRe = /(extension\s+date|revised\s+(end|expiry)\s+date|new\s+(end|expiry)\s+date|contract\s+end\s+date)/i;
     const datePickerWidget = page
         .locator('.nexxe-input-wrapper.input-date, .nexxe-input-wrapper, dm-input, .input-date')
         .filter({ has: page.locator('label').filter({ hasText: labelRe }) })
-        .first();
+        .first()
+        .or(page.locator('.mat-form-field').filter({ hasText: labelRe }).first())
+        .or(page.locator('mat-form-field').filter({ hasText: labelRe }).first());
 
     await expect(datePickerWidget).toBeVisible({ timeout: 180_000 });
 
@@ -48,60 +50,85 @@ export async function handleExtensionDateSelection(page: Page, dateStr: string) 
     // Used for widget text assertion (we don't assume one exact display format)
     const dateToAssert = dmySlashToSet;
 
-    await openExtensionDatePicker(page, datePickerWidget, dateElement, inputContainer);
+    let dateSetSuccessfully = false;
 
-    const calendarOpened = await isMaterialDatepickerOpen(page);
+    // Fast-path: Try to fill the input directly without opening the calendar if possible
+    const dateInput = datePickerWidget
+        .locator('input[type="date"], input[placeholder*="DD/MM/YYYY" i], input[placeholder*="date" i], input, [role="textbox"]')
+        .first();
 
-    if (calendarOpened) {
-        const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-        const month = monthNames[monthNum - 1];
-        await selectDateInMaterialCalendar(page, year, month, day);
-        await page.waitForTimeout(500);
-    } else {
-        // Prefer filling the input INSIDE the widget (avoid any other date inputs on the page)
-        const dateInput = datePickerWidget
-            .locator('input[type="date"], input[placeholder*="DD/MM/YYYY" i], input[placeholder*="date" i], input, [role="textbox"]')
-            .first();
+    if (await dateInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        const type = (await dateInput.getAttribute('type').catch(() => '')) || '';
+        const placeholder = (await dateInput.getAttribute('placeholder').catch(() => '')) || '';
+        const isReadonly = (await dateInput.getAttribute('readonly').catch(() => null)) !== null;
 
-        if (await dateInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
-            // Some widgets accept ISO, others accept DD/MM/YYYY; try best-match based on input type/placeholder.
-            const type = (await dateInput.getAttribute('type').catch(() => '')) || '';
-            const placeholder = (await dateInput.getAttribute('placeholder').catch(() => '')) || '';
+        const preferred = type.toLowerCase() === 'date' ? isoToSet : (/(dd\/mm\/yyyy|dd\/mm)/i.test(placeholder) ? dmySlashToSet : dmySlashToSet);
+        const fallbacks = [dmySlashToSet, isoToSet, dMmmToSet].filter((v, idx, arr) => arr.indexOf(v) === idx);
 
-            const preferred = type.toLowerCase() === 'date' ? isoToSet : (/(dd\/mm\/yyyy|dd\/mm)/i.test(placeholder) ? dmySlashToSet : dmySlashToSet);
-            const fallbacks = [dmySlashToSet, isoToSet, dMmmToSet].filter((v, idx, arr) => arr.indexOf(v) === idx);
+        // Force click and force fill bypasses the readonly check for inputting test automation data
+        await dateInput.click({ timeout: 5_000, force: true }).catch(() => { });
 
-            await dateInput.click({ timeout: 30_000 }).catch(() => { });
-            // Clear robustly (some inputs don't support .clear())
+        if (!isReadonly) {
             await dateInput.fill('').catch(() => { });
-
-            const toTry = [preferred, ...fallbacks.filter(v => v !== preferred)];
-            for (const v of toTry) {
-                await dateInput.fill(v).catch(() => { });
-                await page.keyboard.press('Enter').catch(() => { });
-                // Blur/click-away helps some builds commit the date
-                await page.mouse.click(10, 10).catch(() => { });
-                await page.waitForTimeout(250);
-
-                const observed = await dateInput.inputValue().catch(() => '');
-                if ((observed || '').trim()) break;
-            }
         } else {
-            // JS Fallback
-            await page.evaluate(({ d }) => {
-                const dateSpans = document.querySelectorAll('.span-date-element');
-                for (let i = 0; i < dateSpans.length; i++) {
-                    const span = dateSpans[i];
-                    const parent = span.closest('.nexxe-input-wrapper');
-                    if (parent?.querySelector('label')?.textContent?.includes('Extension Date')) {
-                        span.textContent = d;
-                        span.dispatchEvent(new Event('input', { bubbles: true }));
-                        span.dispatchEvent(new Event('change', { bubbles: true }));
+            // Evaluating readOnly removal so JS event handlers trigger normally
+            await dateInput.evaluate((el: HTMLInputElement) => el.readOnly = false).catch(() => { });
+            await dateInput.fill('').catch(() => { });
+        }
+
+        for (const v of [preferred, ...fallbacks.filter(x => x !== preferred)]) {
+            await dateInput.fill(v, { force: true }).catch(() => { });
+            await page.keyboard.press('Enter').catch(() => { });
+            await page.mouse.click(10, 10).catch(() => { });
+            await page.waitForTimeout(250);
+
+            const observed = await dateInput.inputValue().catch(() => '');
+            if ((observed || '').trim()) {
+                dateSetSuccessfully = true;
+                break;
+            }
+        }
+    }
+
+    if (!dateSetSuccessfully) {
+        // Evaluate JS fallback directly hooking into angular material forms if possible
+        dateSetSuccessfully = await page.evaluate(({ d }) => {
+            const inputs = document.querySelectorAll('.span-date-element, input.mat-input-element');
+            for (let i = 0; i < inputs.length; i++) {
+                const el = inputs[i] as any;
+                const parent = el.closest('.nexxe-input-wrapper') || el.closest('.mat-form-field') || el.parentElement;
+                if (parent?.textContent?.toLowerCase().includes('date')) {
+                    if (el.tagName === 'INPUT') {
+                        const originalReadonly = el.readOnly;
+                        if (originalReadonly) el.readOnly = false;
+                        el.value = d;
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                        el.dispatchEvent(new Event('blur', { bubbles: true }));
+                        if (originalReadonly) el.readOnly = true;
+                        return true;
+                    } else {
+                        el.textContent = d;
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
                         return true;
                     }
                 }
-                return false;
-            }, { d: dmySlashToSet });
+            }
+            return false;
+        }, { d: dmySlashToSet }).catch(() => false);
+    }
+
+    if (!dateSetSuccessfully) {
+        await openExtensionDatePicker(page, datePickerWidget, dateElement, inputContainer);
+
+        const calendarOpened = await isMaterialDatepickerOpen(page);
+
+        if (calendarOpened) {
+            const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+            const month = monthNames[monthNum - 1];
+            await selectDateInMaterialCalendar(page, year, month, day);
+            await page.waitForTimeout(500);
         }
     }
 
@@ -218,9 +245,12 @@ async function selectDateInMaterialCalendar(page: Page, year: number, month: str
     // Navigate to the target year (handles ranges like "2020 – 2043")
     const maxAttempts = 40;
     for (let i = 0; i < maxAttempts; i++) {
-        const yearCell = root.locator('.mat-calendar-body-cell').filter({ hasText: new RegExp(`^${year}$`) }).first();
-        if (await yearCell.isVisible().catch(() => false)) {
-            await yearCell.click({ timeout: 10_000 }).catch(() => yearCell.click({ timeout: 10_000, force: true }));
+        const yearCell = root.locator('.mat-calendar-body-cell').filter({ hasText: new RegExp(`^\\s*${year}\\s*$`) }).first();
+        const yearFallback = root.locator('.mat-calendar-body-cell').filter({ hasText: new RegExp(`\\b${year}\\b`) }).first();
+        const targetYearCell = (await yearCell.isVisible().catch(() => false)) ? yearCell : yearFallback;
+
+        if (await targetYearCell.isVisible().catch(() => false)) {
+            await targetYearCell.click({ timeout: 10_000 }).catch(() => targetYearCell.click({ timeout: 10_000, force: true }));
             break;
         }
 
@@ -267,23 +297,39 @@ async function selectDateInMaterialCalendar(page: Page, year: number, month: str
         DEC: 'December',
     })[month.toUpperCase()] || month;
 
-    const monthCellAbbrev = root.locator('.mat-calendar-body-cell').filter({ hasText: new RegExp(`^${escapeRegex(month)}$`, 'i') }).first();
-    const monthCellFull = root.locator('.mat-calendar-body-cell').filter({ hasText: new RegExp(`^${escapeRegex(monthFull)}$`, 'i') }).first();
+    const monthCellAbbrev = root.locator('.mat-calendar-body-cell').filter({ hasText: new RegExp(`^\\s*${escapeRegex(month)}\\s*$`, 'i') }).first();
+    const monthCellFull = root.locator('.mat-calendar-body-cell').filter({ hasText: new RegExp(`^\\s*${escapeRegex(monthFull)}\\s*$`, 'i') }).first();
+    const monthFallback = root.locator('.mat-calendar-body-cell').filter({ hasText: new RegExp(`\\b${escapeRegex(month)}\\b`, 'i') }).first();
 
-    if (await monthCellAbbrev.isVisible().catch(() => false)) {
-        await monthCellAbbrev.click({ timeout: 10_000 }).catch(() => monthCellAbbrev.click({ timeout: 10_000, force: true }));
-    } else {
-        await monthCellFull.click({ timeout: 10_000 }).catch(() => monthCellFull.click({ timeout: 10_000, force: true }));
+    const targetMonthCell = (await monthCellAbbrev.isVisible().catch(() => false)) ? monthCellAbbrev :
+        (await monthCellFull.isVisible().catch(() => false)) ? monthCellFull : monthFallback;
+
+    if (await targetMonthCell.isVisible().catch(() => false)) {
+        await targetMonthCell.click({ timeout: 10_000 }).catch(() => targetMonthCell.click({ timeout: 10_000, force: true }));
     }
     await page.waitForTimeout(300);
 
     // Day
+    // Wait for calendar to be responsive before clicking the day
+    await page.waitForTimeout(500);
+
+    const matchStr = String(day);
+    // Be very lenient in finding the day cell, stripping whitespace and matching purely.
     const dayCell = root
-        .locator('.mat-calendar-body-cell:not(.mat-calendar-body-disabled)')
-        .filter({ hasText: new RegExp(`^${day}$`) })
+        .locator('.mat-calendar-body-cell:not(.mat-calendar-body-disabled), .mat-calendar-body-cell-content')
+        .filter({ hasText: new RegExp(`^\\s*0?${matchStr}\\s*$`, 'i') })
         .first();
-    await expect(dayCell).toBeVisible({ timeout: 10_000 });
-    await dayCell.click({ timeout: 10_000 }).catch(() => dayCell.click({ timeout: 10_000, force: true }));
+
+    // If still fails to find, fall back to matching exactly bounded tokens
+    const dayCellFallback = root
+        .locator('.mat-calendar-body-cell:not(.mat-calendar-body-disabled)')
+        .filter({ hasText: new RegExp(`\\b${matchStr}\\b`) })
+        .first();
+
+    const targetDayCell = (await dayCell.isVisible().catch(() => false)) ? dayCell : dayCellFallback;
+
+    await expect(targetDayCell).toBeVisible({ timeout: 10_000 });
+    await targetDayCell.click({ timeout: 10_000 }).catch(() => targetDayCell.click({ timeout: 10_000, force: true }));
 }
 
 async function assertExtensionDateSet(widget: Locator, dateToSet: string): Promise<void> {
