@@ -229,6 +229,16 @@
             background: rgba(34, 197, 94, 0.18);
         }
 
+        .btn-bad {
+            background: rgba(239, 68, 68, 0.10);
+            border-color: rgba(239, 68, 68, 0.30);
+            color: #b91c1c;
+        }
+
+        .btn-bad:hover {
+            background: rgba(239, 68, 68, 0.18);
+        }
+
         .btn-sm {
             padding: 6px 10px;
             font-size: 11px;
@@ -401,6 +411,49 @@
             flex-wrap: wrap;
         }
 
+        /* ── New Layout Styles ── */
+        .border-active {
+            border-color: rgba(37, 99, 235, 0.4);
+            box-shadow: 0 4px 20px rgba(37, 99, 235, 0.12);
+        }
+
+        .toggle-header {
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .toggle-header:hover {
+            background: rgba(15, 23, 42, 0.02);
+        }
+
+        .chevron-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.3s ease;
+        }
+
+        .toggle-body {
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease;
+            max-height: 2000px;
+            opacity: 1;
+        }
+
+        .toggle-body.collapsed {
+            max-height: 0;
+            opacity: 0;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }
+
+        .chevron-icon.rotated {
+            transform: rotate(-180deg);
+        }
+
         /* ── Empty state ── */
         .empty {
             text-align: center;
@@ -516,6 +569,10 @@
                     <button type="button" class="btn-primary" id="triggerBtn" onclick="triggerRun()">
                         &#9654; Run
                     </button>
+                    <button type="button" class="btn-bad" id="stopBtn" onclick="stopActiveRuns()" style="display: none;"
+                        title="Cancel running workflow">
+                        &#9724; Stop
+                    </button>
                     <button type="button" class="btn-sm" onclick="refreshRuns()">
                         &#8635; Refresh
                     </button>
@@ -523,15 +580,35 @@
             </div>
         </div>
 
-        <!-- Runs Card -->
-        <div class="card">
+        <!-- Current Run Card -->
+        <div class="card border-active" id="activeRunsCard" style="display: none;">
             <div class="card-header">
-                <h2 class="card-title">Recent Runs</h2>
-                <p class="card-desc">Showing the last 15 workflow runs. Auto-refreshes every 15 seconds when a run is in
-                    progress.</p>
+                <h2 class="card-title" style="color: #1d4ed8;">Current Run</h2>
+                <p class="card-desc">Your active and most recently completed workflow session.</p>
             </div>
             <div class="card-body" style="padding: 0;">
-                <div id="runsContainer">
+                <div id="activeRunsContainer">
+                    <div class="empty">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Runs Card (Collapsible) -->
+        <div class="card toggle-card" id="recentRunsCard">
+            <div class="card-header toggle-header" onclick="toggleRecentRuns()">
+                <div>
+                    <h2 class="card-title">Recent Runs</h2>
+                    <p class="card-desc">History of previously completed workflow executions. Click to view.</p>
+                </div>
+                <div class="chevron-icon" id="recentRunsChevron">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(15, 23, 42, 0.4)"
+                        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </div>
+            </div>
+            <div class="card-body toggle-body collapsed" id="recentRunsBody" style="padding: 0;">
+                <div id="recentRunsContainer">
                     <div class="empty">Loading...</div>
                 </div>
             </div>
@@ -547,6 +624,7 @@
         const API = '';
         let pollTimer = null;
         let isTriggering = false;
+        let trackedRunIds = new Set();
 
         // ── Status banner ──
         function showStatus(type, msg, showSpinner = false) {
@@ -597,7 +675,9 @@
             if (isTriggering) return;
 
             isTriggering = true;
+            trackedRunIds.clear(); // Clear so the new run becomes the sole "Current Run"
             document.getElementById('triggerBtn').disabled = true;
+            document.getElementById('stopBtn').style.display = 'none';
             showStatus('info', `Triggering "${agent}"...`, true);
 
             try {
@@ -662,36 +742,93 @@
         }
 
         function renderRuns(runs) {
-            let html = `<table class="runs-table">
-                <thead><tr>
-                    <th>Run</th>
-                    <th>Status</th>
-                    <th>Triggered</th>
-                    <th>Actions</th>
-                </tr></thead><tbody>`;
+            // Persist any active run in this browser session so it stays pinned after completion
+            let hasActiveNow = false;
+            runs.forEach(r => {
+                if (r.status === 'queued' || r.status === 'in_progress') {
+                    trackedRunIds.add(r.id);
+                    hasActiveNow = true;
+                }
+            });
 
-            for (const r of runs) {
-                const badge = statusBadge(r.status, r.conclusion);
-                const time = timeAgo(r.createdAt);
-                const title = r.displayTitle || `Run #${r.runNumber}`;
+            // Toggle Stop button state based on active runs
+            const stopBtn = document.getElementById('stopBtn');
+            if (hasActiveNow) {
+                stopBtn.style.display = 'inline-flex';
+                stopBtn.disabled = false;
 
-                html += `<tr>
-                    <td><strong>${escHtml(title)}</strong></td>
-                    <td>${badge}</td>
-                    <td style="color:var(--muted);font-size:12px;white-space:nowrap">${time}</td>
-                    <td>
-                        <div class="actions-cell">
-                            <a href="${escHtml(r.htmlUrl)}" target="_blank" rel="noopener noreferrer">
-                                <button type="button" class="btn-sm">View on GitHub</button>
-                            </a>
-                            ${r.status === 'completed' ? `<button type="button" class="btn-sm btn-ok" onclick="downloadReport(${r.id})">Download Report</button>` : ''}
-                        </div>
-                    </td>
-                </tr>`;
+                // Clear the "Workflow triggered..." banner now that the run has appeared
+                const banner = document.getElementById('statusBanner');
+                if (banner.classList.contains('ok')) hideStatus();
+            } else {
+                stopBtn.style.display = 'none';
             }
 
-            html += '</tbody></table>';
-            document.getElementById('runsContainer').innerHTML = html;
+            const activeRuns = runs.filter(r => trackedRunIds.has(r.id));
+            const pastRuns = runs.filter(r => !trackedRunIds.has(r.id));
+
+            // Render Active Runs
+            if (activeRuns.length > 0) {
+                let activeHtml = `<table class="runs-table">
+                    <thead><tr>
+                        <th>Run</th>
+                        <th>Status</th>
+                        <th>Started</th>
+                        <th>Actions</th>
+                    </tr></thead><tbody>`;
+
+                for (const r of activeRuns) {
+                    activeHtml += generateRunRow(r);
+                }
+                activeHtml += '</tbody></table>';
+                document.getElementById('activeRunsContainer').innerHTML = activeHtml;
+                document.getElementById('activeRunsCard').style.display = 'block';
+            } else {
+                document.getElementById('activeRunsContainer').innerHTML = '<div class="empty">No runs currently active.</div>';
+                document.getElementById('activeRunsCard').style.display = 'none';
+            }
+
+            // Render Recent Runs
+            if (pastRuns.length > 0) {
+                let pastHtml = `<table class="runs-table">
+                    <thead><tr>
+                        <th>Run</th>
+                        <th>Status</th>
+                        <th>Triggered</th>
+                        <th>Actions</th>
+                    </tr></thead><tbody>`;
+
+                for (const r of pastRuns) {
+                    pastHtml += generateRunRow(r);
+                }
+                pastHtml += '</tbody></table>';
+                document.getElementById('recentRunsContainer').innerHTML = pastHtml;
+            } else {
+                document.getElementById('recentRunsContainer').innerHTML = '<div class="empty">No recent workflow runs.</div>';
+            }
+        }
+
+        function generateRunRow(r) {
+            const badge = statusBadge(r.status, r.conclusion);
+            const time = timeAgo(r.createdAt);
+            const title = r.displayTitle || `Run #${r.runNumber}`;
+
+            const isDone = r.status === 'completed';
+            const showReportBtn = isDone ? `<button type="button" class="btn-sm btn-ok" onclick="downloadReport(${r.id})">Download Report</button>` : '';
+
+            return `<tr>
+                <td><strong>${escHtml(title)}</strong></td>
+                <td>${badge}</td>
+                <td style="color:var(--muted);font-size:12px;white-space:nowrap">${time}</td>
+                <td>
+                    <div class="actions-cell">
+                        <a href="${escHtml(r.htmlUrl)}" target="_blank" rel="noopener noreferrer">
+                            <button type="button" class="btn-sm">View on GitHub</button>
+                        </a>
+                        ${showReportBtn}
+                    </div>
+                </td>
+            </tr>`;
         }
 
         function statusBadge(status, conclusion) {
@@ -770,6 +907,49 @@
             if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
             if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
             return `${Math.floor(diffSec / 86400)}d ago`;
+        }
+
+        // ── Stop Active Runs ──
+        async function stopActiveRuns() {
+            if (trackedRunIds.size === 0) return;
+            const stopBtn = document.getElementById('stopBtn');
+            stopBtn.disabled = true;
+            stopBtn.innerHTML = '&#8983; Stopping...';
+            showStatus('info', 'Cancelling workflow runs...', true);
+
+            try {
+                // Determine which tracked runs are actually still active based on the current UI state
+                // This is a rough estimation since we just need the IDs; we will attempt to cancel all currently tracked IDs
+                const promises = Array.from(trackedRunIds).map(runId =>
+                    fetch(`${API}/api/runs/${runId}/cancel`, { method: 'POST' })
+                        .then(res => res.json())
+                        .catch(err => ({ error: err.message }))
+                );
+
+                await Promise.all(promises);
+
+                showStatus('info', 'Cancellation requested. Refreshing...', true);
+                setTimeout(() => refreshRuns(), 3000);
+            } catch (err) {
+                showStatus('bad', `Failed to cancel: ${err.message}`);
+                stopBtn.disabled = false;
+                stopBtn.innerHTML = '&#9724; Stop';
+            }
+        }
+
+        // ── Toggle Recent Runs ──
+        function toggleRecentRuns() {
+            const body = document.getElementById('recentRunsBody');
+            const chevron = document.getElementById('recentRunsChevron');
+            const isCollapsed = body.classList.contains('collapsed');
+
+            if (isCollapsed) {
+                body.classList.remove('collapsed');
+                chevron.classList.add('rotated');
+            } else {
+                body.classList.add('collapsed');
+                chevron.classList.remove('rotated');
+            }
         }
 
         // ── Init ──

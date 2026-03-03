@@ -160,6 +160,23 @@ app.get('/api/runs/:runId', async (req, res) => {
     }
 });
 
+// ── POST /api/runs/:runId/cancel — Cancel a run ──
+app.post('/api/runs/:runId/cancel', async (req, res) => {
+    try {
+        const resp = await gh(`/repos/${GITHUB_REPO}/actions/runs/${req.params.runId}/cancel`, {
+            method: 'POST'
+        });
+        if (resp.status === 202) {
+            return res.json({ success: true, message: 'Workflow cancellation requested.' });
+        }
+        // If already completed or error
+        const body = await resp.text().catch(() => '');
+        return res.status(resp.status).json({ error: `GitHub returned ${resp.status}: ${body}` });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 // ── GET /api/artifacts/:runId — List artifacts for a run ──
 app.get('/api/artifacts/:runId', async (req, res) => {
     try {
