@@ -62,16 +62,16 @@ jobs:
           target=""
           case "${{ inputs.run }}" in
             "suite") target="automation/tests" ;;
-            "agent-1.1 Supplier Offboarding Assistant") target="automation/tests/agent1.spec.ts" ;;
-            "agent-1.2 Supplier Offboarding Assistant") target="automation/tests/agent1.2.spec.ts" ;;
-            "agent-2.1 Contract Amendment Assistant") target="automation/tests/agent2.spec.ts" ;;
-            "agent-2.2 Contract Amendment Assistant") target="automation/tests/agent2.1.spec.ts" ;;
-            "agent-3.1 Contract Termination Assistant") target="automation/tests/agent3.spec.ts" ;;
-            "agent-3.2 Contract Termination Assistant") target="automation/tests/agent3_1.spec.ts" ;;
-            "agent-4.1 Contract Extension Assistant") target="automation/tests/agent4.spec.ts" ;;
-            "agent-4.2 Contract Extension Assistant") target="automation/tests/agent4.1.spec.ts" ;;
-            "agent-5.1 Supplier Profile Update Assistant") target="automation/tests/agent5.spec.ts" ;;
-            "agent-5.2 Supplier Profile Update Assistant") target="automation/tests/agent5_1.spec.ts" ;;
+            "Agent-1.1 Supplier Offboarding Assistant") target="automation/tests/agent1.spec.ts" ;;
+            "Agent-1.2 Supplier Offboarding Assistant") target="automation/tests/agent1.2.spec.ts" ;;
+            "Agent-2.1 Contract Amendment Assistant") target="automation/tests/agent2.spec.ts" ;;
+            "Agent-2.2 Contract Amendment Assistant") target="automation/tests/agent2.1.spec.ts" ;;
+            "Agent-3.1 Contract Termination Assistant") target="automation/tests/agent3.spec.ts" ;;
+            "Agent-3.2 Contract Termination Assistant") target="automation/tests/agent3_1.spec.ts" ;;
+            "Agent-4.1 Contract Extension Assistant") target="automation/tests/agent4.spec.ts" ;;
+            "Agent-4.2 Contract Extension Assistant") target="automation/tests/agent4.1.spec.ts" ;;
+            "Agent-5.1 Supplier Profile Update Assistant") target="automation/tests/agent5.spec.ts" ;;
+            "Agent-5.2 Supplier Profile Update Assistant") target="automation/tests/agent5_1.spec.ts" ;;
             *) echo "::error::Unknown selection: ${{ inputs.run }}"; exit 2 ;;
           esac
 
