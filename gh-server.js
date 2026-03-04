@@ -1,13 +1,23 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
+import AdmZip from 'adm-zip';
 
 const app = express();
 const PORT = Number(process.env.PORT || 3002);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const REPORTS_DIR = path.join(__dirname, 'reports');
+if (!fs.existsSync(REPORTS_DIR)) {
+    fs.mkdirSync(REPORTS_DIR, { recursive: true });
+}
+
+// Serve extracted reports statically
+app.use('/reports', express.static(REPORTS_DIR));
 
 // ── GitHub configuration (set via environment variables) ──
 const GITHUB_TOKEN = (process.env.GITHUB_TOKEN || '').trim();
@@ -219,6 +229,51 @@ app.get('/api/download/:artifactId', async (req, res) => {
         }
 
         return res.status(ghResp.status).json({ error: `GitHub returned ${ghResp.status}` });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// ── GET /api/report/:artifactId — Extract and serve report HTML ──
+app.get('/api/report/:artifactId', async (req, res) => {
+    try {
+        const artifactId = req.params.artifactId;
+        const reportPath = path.join(REPORTS_DIR, artifactId);
+
+        // If already extracted, just return the URL
+        if (fs.existsSync(path.join(reportPath, 'index.html'))) {
+            return res.json({ url: `/reports/${artifactId}/index.html` });
+        }
+
+        const ghResp = await fetch(
+            `${GH_API}/repos/${GITHUB_REPO}/actions/artifacts/${artifactId}/zip`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github+json',
+                },
+                redirect: 'manual',
+            }
+        );
+
+        if (ghResp.status !== 302) {
+            return res.status(ghResp.status).json({ error: `GitHub returned ${ghResp.status}` });
+        }
+
+        const signedUrl = ghResp.headers.get('location');
+
+        // Download the actual zip
+        const zipResp = await fetch(signedUrl);
+        if (!zipResp.ok) throw new Error(`Failed to download zip: ${zipResp.status}`);
+
+        const arrayBuffer = await zipResp.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        // Extract it
+        const zip = new AdmZip(buffer);
+        zip.extractAllTo(reportPath, true);
+
+        return res.json({ url: `/reports/${artifactId}/index.html` });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }

@@ -814,7 +814,7 @@
             const title = r.displayTitle || `Run #${r.runNumber}`;
 
             const isDone = r.status === 'completed';
-            const showReportBtn = isDone ? `<button type="button" class="btn-sm btn-ok" onclick="downloadReport(${r.id})">Download Report</button>` : '';
+            const showReportBtn = isDone ? `<button type="button" class="btn-sm btn-ok" onclick="viewReport(${r.id})">View Report</button>` : '';
 
             return `<tr>
                 <td><strong>${escHtml(title)}</strong></td>
@@ -851,8 +851,8 @@
             return `<span class="badge ${cls}"><span class="badge-dot"></span>${label}</span>`;
         }
 
-        // ── Download report artifact ──
-        async function downloadReport(runId) {
+        // ── View report artifact ──
+        async function viewReport(runId) {
             try {
                 showStatus('info', 'Fetching report artifact...', true);
                 const resp = await fetch(`${API}/api/artifacts/${runId}`);
@@ -874,8 +874,17 @@
                     return;
                 }
 
-                // Trigger download via the proxy endpoint
-                window.open(`${API}/api/download/${report.id}`, '_blank');
+                showStatus('info', 'Extracting and preparing report...', true);
+                const reportResp = await fetch(`${API}/api/report/${report.id}`);
+                const reportData = await reportResp.json();
+
+                if (!reportResp.ok) {
+                    showStatus('bad', reportData.error || 'Failed to prepare report.');
+                    return;
+                }
+
+                // Open the extracted report
+                window.open(`${API}${reportData.url}`, '_blank');
                 hideStatus();
             } catch (err) {
                 showStatus('bad', `Error: ${err.message}`);
